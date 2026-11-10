@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tokguard"
+version = "0.1.0"
+description = "Token-saving setup and MCP tools for coding agents"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "mcp>=1.0.0",
+]
+
+[project.scripts]
+tg = "tg.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["tg*", "tokguard*", "scripts*", "bench*"]
+
