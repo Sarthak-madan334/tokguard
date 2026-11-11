@@ -2,6 +2,8 @@
 
 A lightweight token-saving toolkit for Codex, Claude Code, Antigravity, and other MCP-compatible coding agents.
 
+The TokGuard product site lives in [`website/`](website/README.md). It is a Next.js and React app styled with Tailwind CSS.
+
 ---
 
 ## One-command setup for Codex, Claude Code, and Antigravity
