@@ -31,6 +31,9 @@ DEFAULT_IGNORES = {
     "yarn.lock",
 }
 
+MAX_SCAN_FILE_BYTES = 1_000_000
+SYMBOL_SOURCE_SUFFIXES = {".py", ".js", ".jsx", ".ts", ".tsx", ".mjs", ".go", ".rs", ".java"}
+
 REGEX_PATTERNS = {
     # JS/TS
     r"\.(js|jsx|ts|tsx|mjs)$": [
@@ -63,7 +66,7 @@ def load_ignore_patterns(root: Path) -> Set[str]:
         fpath = root / fname
         if fpath.exists():
             for line in fpath.read_text(encoding="utf-8", errors="ignore").splitlines():
-                line = line.strip()
+                line = line.strip().rstrip("/\\")
                 if line and not line.startswith("#"):
                     patterns.add(line)
     return patterns
@@ -79,6 +82,19 @@ def is_ignored(rel_path: str, patterns: Set[str]) -> bool:
             if fnmatch.fnmatch(part, pat) or fnmatch.fnmatch(rel_path, pat):
                 return True
     return False
+
+
+def _read_scan_text(fpath: Path) -> Optional[str]:
+    """Read a small text file for scanning; skip oversized and binary files."""
+    try:
+        if fpath.stat().st_size > MAX_SCAN_FILE_BYTES:
+            return None
+        content = fpath.read_bytes()
+    except OSError:
+        return None
+    if b"\0" in content:
+        return None
+    return content.decode("utf-8", errors="ignore")
 
 
 def extract_python_symbols(source: str) -> List[str]:
@@ -130,12 +146,14 @@ def extract_regex_symbols(source: str, filename: str) -> List[str]:
 
 def extract_symbols(fpath: Path) -> List[str]:
     """Extract top symbols from a given file."""
-    try:
-        content = fpath.read_text(encoding="utf-8", errors="ignore")
-    except Exception:
+    suffix = fpath.suffix.lower()
+    if suffix not in SYMBOL_SOURCE_SUFFIXES:
+        return []
+    content = _read_scan_text(fpath)
+    if content is None:
         return []
 
-    if fpath.suffix == ".py":
+    if suffix == ".py":
         return extract_python_symbols(content)
     return extract_regex_symbols(content, fpath.name)
 
@@ -217,6 +235,7 @@ def generate_repo_map(root: Path = Path(".")) -> str:
 
 def find_symbol(query: str, root: Path = Path("."), max_results: int = 20) -> str:
     """Search for symbol or regex pattern across files with 1 line of context."""
+    max_results = max(1, max_results)
     patterns = load_ignore_patterns(root)
     try:
         regex = re.compile(query, re.IGNORECASE)
@@ -224,7 +243,8 @@ def find_symbol(query: str, root: Path = Path("."), max_results: int = 20) -> st
         regex = re.compile(re.escape(query), re.IGNORECASE)
 
     matches: List[str] = []
-    total_found = 0
+    skipped_large = 0
+    stopped_early = False
 
     for dirpath, dirnames, filenames in os.walk(root):
         rel_dir = os.path.relpath(dirpath, root)
@@ -240,14 +260,18 @@ def find_symbol(query: str, root: Path = Path("."), max_results: int = 20) -> st
 
             fpath = Path(dirpath) / fname
             try:
-                content = fpath.read_text(encoding="utf-8", errors="ignore")
-            except Exception:
+                if fpath.stat().st_size > MAX_SCAN_FILE_BYTES:
+                    skipped_large += 1
+                    continue
+            except OSError:
+                continue
+            content = _read_scan_text(fpath)
+            if content is None:
                 continue
 
             lines = content.splitlines()
             for idx, line in enumerate(lines):
                 if regex.search(line):
-                    total_found += 1
                     if len(matches) < max_results:
                         line_num = idx + 1
                         # Format hit with 1 line context
@@ -258,13 +282,25 @@ def find_symbol(query: str, root: Path = Path("."), max_results: int = 20) -> st
                         if idx + 1 < len(lines):
                             ctx.append(f"  {idx+2:4d} | {lines[idx+1]}")
                         matches.append(f"{rel_file}:{line_num}\n" + "\n".join(ctx))
+                        if len(matches) >= max_results:
+                            stopped_early = True
+                            break
+            if stopped_early:
+                break
+        if stopped_early:
+            break
 
     if not matches:
-        return f"No matches found for '{query}'."
+        result = f"No matches found for '{query}'."
+        if skipped_large:
+            result += f"\n[Skipped {skipped_large} files larger than {MAX_SCAN_FILE_BYTES // 1_000_000} MB.]"
+        return result
 
     res = "\n\n".join(matches)
-    if total_found > max_results:
-        res += f"\n\n[... {total_found - max_results} additional matches omitted; refine query]"
+    if stopped_early:
+        res += f"\n\n[Stopped after {max_results} matches; refine query to search further.]"
+    if skipped_large:
+        res += f"\n\n[Skipped {skipped_large} files larger than {MAX_SCAN_FILE_BYTES // 1_000_000} MB.]"
     return res
 
 

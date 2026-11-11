@@ -1,4 +1,11 @@
 __pycache__/
+**/__pycache__/
+tg/__pycache__/
+scripts/__pycache__/
+bench/__pycache__/
+tokguard/__pycache__/
+*.py[cod]
+*.egg-info/
 *.pyc
 *.pyo
 .pytest_cache/

@@ -12,7 +12,7 @@ from typing import Callable
 
 _START = "<!-- tokguard:begin -->"
 _END = "<!-- tokguard:end -->"
-_SERVER = {"command": "npx", "args": ["-y", "tokguard", "mcp"]}
+_SERVER = {"command": "npx", "args": ["-y", "tokguard@latest", "mcp"]}
 _GUIDANCE = (
     "Use the TokGuard MCP tools for repository work when available. Start with `map`, "
     "then use `find` and targeted `read_range` or `read_symbol` calls. Use `run` for "
@@ -91,7 +91,7 @@ def _upsert_codex_server(path: Path) -> None:
         [
             "[mcp_servers.tokguard]",
             'command = "npx"',
-            'args = ["-y", "tokguard", "mcp"]',
+            'args = ["-y", "tokguard@latest", "mcp"]',
             "startup_timeout_sec = 30",
             "",
             "[mcp_servers.tokguard.tools.map]",

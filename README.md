@@ -21,6 +21,21 @@ tokguard setup
 
 `setup` registers TokGuard's MCP server in each assistant's user-level settings and adds a small managed instruction block so the assistants know when to use it. Existing settings are preserved. Restart the assistants after setup. The setup works across projects on that machine; use `tg init` below when you also want project-local TokGuard guidance and settings.
 
+### Update TokGuard in PowerShell
+
+For a global installation, update TokGuard and refresh assistant settings with:
+
+```powershell
+npm install -g tokguard@latest
+tokguard setup
+```
+
+For a one-time `npx` setup, use the latest release directly:
+
+```powershell
+npx -y tokguard@latest setup
+```
+
 ## Project-local setup
 
 `tg init` adds repository-specific instructions, `.tgignore`, and `.tokguard/config.json` without replacing existing files.

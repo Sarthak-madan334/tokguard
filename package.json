@@ -1,6 +1,6 @@
 {
   "name": "tokguard",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "repository": {
     "type": "git",
     "url": "https://github.com/Sarthak-madan334/tokguard.git"
@@ -13,10 +13,11 @@
   },
   "files": [
     "cli.js",
-    "tg",
-    "tokguard",
-    "scripts",
-    "bench",
+    "tg/*.py",
+    "tokguard/*.py",
+    "scripts/*.py",
+    "bench/*.py",
+    "bench/fixture/*.py",
     "AGENTS.md",
     "CLAUDE.md",
     ".cursorrules",
