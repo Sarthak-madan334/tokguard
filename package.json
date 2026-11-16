@@ -13,6 +13,7 @@
   },
   "files": [
     "cli.js",
+    "lib/*.js",
     "tg/*.py",
     "tokguard/*.py",
     "scripts/*.py",

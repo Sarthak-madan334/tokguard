@@ -3,6 +3,7 @@
 const { spawn, execSync } = require('child_process');
 const path = require('path');
 const fs = require('fs');
+const { maybeAutoUpdate } = require('./lib/auto-update');
 
 const rootDir = __dirname;
 
@@ -31,6 +32,8 @@ function findPython() {
 
 const pythonBin = findPython();
 const args = process.argv.slice(2);
+const updateExitCode = maybeAutoUpdate({ rootDir, args });
+if (updateExitCode !== null) process.exit(updateExitCode);
 
 // Auto-check and install mcp package if missing
 try {
