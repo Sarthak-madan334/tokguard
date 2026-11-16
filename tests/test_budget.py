@@ -55,7 +55,7 @@ def test_budget_warning_and_automatic_rollover(tmp_path):
     assert "BUDGET ROLLOVER" in msg
     assert (tmp_path / ".tokguard" / "handoff.md").exists()
     assert list((tmp_path / ".tokguard" / "sessions").glob("session-*.json"))
-    assert get_status_line(tmp_path) == "[tg: 0/1.0k tokens used]"
+    assert get_status_line(tmp_path) == "[tg: 0/1.0k tokens | drift -- | step 0/0]"
 
     # 4. Recovery actions are always available at a full budget.
     record_action("cmd:fill", "a" * 4000, root=tmp_path)

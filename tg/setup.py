@@ -14,9 +14,11 @@ _START = "<!-- tokguard:begin -->"
 _END = "<!-- tokguard:end -->"
 _SERVER = {"command": "npx", "args": ["-y", "tokguard@latest", "mcp"]}
 _GUIDANCE = (
-    "Use the TokGuard MCP tools for repository work when available. Start with `map`, "
-    "then use `find` and targeted `read_range` or `read_symbol` calls. Use `run` for "
-    "shell commands when appropriate, and avoid broad file dumps. Keep responses focused."
+    "First action: `tg plan --prompt \"<original user prompt>\"`, then write and submit the work order as a senior tech manager.\n"
+    "Do only what the work order says. Obey every DRIFT message. Update scope only with a reason.\n"
+    "Finish only after `tg verify` PASS.\n"
+    "Map first with `tg map`; search with `tg find`; read only targeted ranges or symbols.\n"
+    "Use `tg run -- <command>` for shell commands and keep outputs tiny. At the session limit, continue after automatic handoff and rollover."
 )
 
 

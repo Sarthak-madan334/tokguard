@@ -11,6 +11,13 @@ DEFAULT_CONFIG = {
     "session_token_budget": 150000,
     "warn_at": 0.7,
     "hard_stop_at": 1.0,
+    "drift_thresholds": {"minor": 21, "major": 46, "off": 71},
+    "check_every_n_calls": 8,
+    "max_files_changed": 8,
+    "max_diff_lines": 300,
+    "protected_globs": ["*lock*", ".github/**", ".gitlab-ci*", "package.json", "pyproject.toml", "*.config.*"],
+    "allow_test_edits": False,
+    "stall_calls": 12,
     "max_tool_output_tokens": 1500,
     "max_file_read_tokens": 2500,
 }
@@ -116,7 +123,17 @@ def record_action(
         if file_touched not in files:
             files.append(file_touched)
 
+    session["manager_call_count"] = session.get("manager_call_count", max(0, len(history) - 1)) + 1
+
     save_session(session, root)
+    if (root / ".tokguard" / "task.json").exists():
+        try:
+            from tg.manager import checkpoint
+            cadence = max(1, int(cfg.get("check_every_n_calls", 8)))
+            if session["manager_call_count"] % cadence == 0 or action_key.startswith(("cmd:", "mcp:run:")):
+                checkpoint(root, action_key, session["manager_call_count"])
+        except (OSError, ValueError, json.JSONDecodeError):
+            pass
     return session["cumulative_tokens"], cfg["session_token_budget"]
 
 
@@ -133,10 +150,20 @@ def check_guard(
     session = load_session(root)
     cfg = load_config(root)
 
-    # A full session must not block its own recovery commands.
-    recovery = action_key == "cmd:handoff" or action_key.startswith("cmd:budget --reset")
+    recovery = (
+        action_key in {"cmd:handoff", "mcp:check", "mcp:handoff", "mcp:revert-plan", "check", "handoff", "revert-plan"}
+        or action_key.startswith(("cmd:budget --reset", "mcp:scope_add:", "scope:add:"))
+    )
     if recovery or override:
         return True, None
+
+    try:
+        from tg.manager import lockout_message
+        blocked = lockout_message(root)
+        if blocked:
+            return False, blocked
+    except (OSError, ValueError, json.JSONDecodeError):
+        pass
 
     used = session.get("cumulative_tokens", 0)
     budget = cfg.get("session_token_budget", 150000)
@@ -174,12 +201,32 @@ def check_guard(
 
 
 def get_status_line(root: Path = Path(".")) -> str:
-    """Return the status line: [tg: 84k/150k tokens used]."""
+    """Return compact session, drift, and step status."""
     session = load_session(root)
     cfg = load_config(root)
     used = session.get("cumulative_tokens", 0)
     budget = cfg.get("session_token_budget", 150000)
-    return f"[tg: {format_token_k(used)}/{format_token_k(budget)} tokens used]"
+    detail = "drift -- | step 0/0"
+    if (root / ".tokguard" / "task.json").exists():
+        try:
+            from tg.manager import check_drift
+            order = json.loads((root / ".tokguard" / "task.json").read_text(encoding="utf-8"))
+            result = check_drift(root, history=False)
+            step_state_path = root / ".tokguard" / "step.json"
+            done = json.loads(step_state_path.read_text(encoding="utf-8")).get("done", []) if step_state_path.exists() else []
+            level = {"ON TRACK": "OK", "MINOR DRIFT": "MINOR", "MAJOR DRIFT": "MAJOR", "OFF TRACK": "OFF"}.get(result["level"], "?")
+            detail = f"drift {result['score']} {level} | step {len(done)}/{len(order['steps'])}"
+        except Exception:
+            pass
+    status = f"[tg: {format_token_k(used)}/{format_token_k(budget)} tokens | {detail}]"
+    try:
+        from tg.manager import consume_checkpoint_notice
+        notice = consume_checkpoint_notice(root)
+        if notice:
+            return notice + "\n" + status
+    except (OSError, ValueError, json.JSONDecodeError):
+        pass
+    return status
 
 
 def generate_handoff(task_summary: str = "In-progress task", root: Path = Path(".")) -> Path:
@@ -218,8 +265,13 @@ def generate_handoff(task_summary: str = "In-progress task", root: Path = Path("
         "  4. Reset budget for new session via `tg budget --reset`.",
     ])
 
-    # Ensure strictly <= 30 lines
-    lines = lines[:30]
+    try:
+        from tg.manager import handoff_context
+        context = handoff_context(root)
+        if context:
+            lines.extend(context.strip().splitlines())
+    except (OSError, ValueError, json.JSONDecodeError):
+        pass
     handoff_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return handoff_path
 

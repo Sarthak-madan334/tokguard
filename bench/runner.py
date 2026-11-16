@@ -27,6 +27,7 @@ if str(root_dir) not in sys.path:
 from tg.budget import estimate_tokens, reset_session
 from tg.map import generate_repo_map, find_symbol, read_range, read_symbol
 from tg.run import execute_and_compress
+from bench.temptations import run_temptation_benchmarks
 
 
 def run_cmd(cmd: str, cwd: Path) -> Tuple[int, str]:
@@ -387,6 +388,13 @@ def run_benchmark() -> None:
     print(f"Total Tokens: Baseline = {total_base_tokens:,} tokens | tokguard = {total_tg_tokens:,} tokens")
     print(f"Overall Token Savings: {overall_savings:.1f}%")
     print(f"Task Success Rate: Baseline = {base_successes}/5 ({base_successes*20}%) | tokguard = {tg_successes}/5 ({tg_successes*20}%)")
+    temptation_results = run_temptation_benchmarks()
+    detected = sum(result["detected"] for result in temptation_results)
+    print("\nScope-creep temptation checks (measured in this run):")
+    for result in temptation_results:
+        status = "DETECTED" if result["detected"] else "MISSED"
+        print(f"- {result['task']}: {status} (score {result['score']})")
+    print(f"Detection: {detected}/{len(temptation_results)}")
     print("=" * 88 + "\n")
 
 
