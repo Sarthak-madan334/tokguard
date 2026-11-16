@@ -38,6 +38,14 @@ For a one-time `npx` setup, use the latest release directly:
 npx -y tokguard@latest setup
 ```
 
+### Automatic updates
+
+A global `tg` or `tokguard` command checks npm at startup, installs a newer release when available, then reruns the original command. If npm is offline or the install lacks permission, TokGuard continues with the installed version. The configured MCP launch also uses `tokguard@latest`, so it picks up releases when the assistant starts the server again. To disable the global CLI update check for a PowerShell session:
+
+```powershell
+$env:TOKGUARD_AUTO_UPDATE = "0"
+```
+
 ## Project-local setup
 
 `tg init` adds repository-specific instructions, `.tgignore`, and `.tokguard/config.json` without replacing existing files.
