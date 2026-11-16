@@ -56,8 +56,8 @@ AGENTS_MD_CONTENT = """# AGENTS.md - Context & Token Rules for tokguard
 - Batch independent commands into a single execution step.
 - Replies: terse. No restating code just written, no diff recaps, no pleasantries. Output unified diffs, not full files. Ask no unnecessary confirmation questions.
 - Do not explore the repo broadly; start from `tg map`.
-- When `tg` reports BUDGET WARNING, wrap up in <=10 lines and ask user before continuing.
-- When `tg` reports BUDGET EXCEEDED, stop tool use immediately and generate handoff.
+- When `tg` reports BUDGET WARNING, keep tool output compact and continue the active task.
+- At the session limit, TokGuard writes a handoff, archives the old ledger, and rolls over automatically. Continue from the handoff; `tg handoff` and `tg budget --reset` always remain available.
 """
 
 MCP_CONFIG_HELP = """
