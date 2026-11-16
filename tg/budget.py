@@ -133,18 +133,28 @@ def check_guard(
     session = load_session(root)
     cfg = load_config(root)
 
+    # A full session must not block its own recovery commands.
+    recovery = action_key == "cmd:handoff" or action_key.startswith("cmd:budget --reset")
+    if recovery or override:
+        return True, None
+
     used = session.get("cumulative_tokens", 0)
     budget = cfg.get("session_token_budget", 150000)
     ratio = used / float(budget) if budget > 0 else 0.0
 
     # 1. Hard stop check
     hard_stop = cfg.get("hard_stop_at", 1.0)
-    if ratio >= hard_stop and not override:
-        msg = (
-            f"BUDGET EXCEEDED: stop and write handoff\n"
-            f"[tg: {format_token_k(used)}/{format_token_k(budget)} tokens used]"
-        )
-        return False, msg
+    if ratio >= hard_stop:
+        # Save context and roll over instead of permanently locking the CLI.
+        handoff = generate_handoff("Automatic TokGuard budget rollover", root=root)
+        import time
+        state = root / ".tokguard"
+        archive = state / "sessions"
+        archive.mkdir(parents=True, exist_ok=True)
+        stamp = f"{time.strftime('%Y%m%dT%H%M%SZ', time.gmtime())}-{time.time_ns()}"
+        (state / "session.json").replace(archive / f"session-{stamp}.json")
+        reset_session(root=root)
+        return True, f"BUDGET ROLLOVER: handoff saved to {handoff.as_posix()}; session archived.\n{get_status_line(root)}"
 
     # 2. Loop detection check
     history: List[str] = session.get("history", [])

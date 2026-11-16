@@ -27,7 +27,7 @@ def test_format_token_k():
     assert format_token_k(150000) == "150k"
 
 
-def test_budget_warning_and_hard_stop(tmp_path):
+def test_budget_warning_and_automatic_rollover(tmp_path):
     # Set small budget for testing
     cfg = load_config(tmp_path)
     cfg["session_token_budget"] = 1000  # 1000 tokens
@@ -48,13 +48,19 @@ def test_budget_warning_and_hard_stop(tmp_path):
     assert msg is not None
     assert "BUDGET WARNING" in msg
 
-    # 3. At or above hard_stop_at (100%)
+    # 3. At or above hard_stop_at, preserve a handoff and roll to a fresh ledger.
     record_action("cmd:pytest3", "a" * 1800, root=tmp_path)  # +450 tokens = 1050 total (105%)
     allowed, msg = check_guard("cmd:pytest4", root=tmp_path)
-    assert allowed is False
-    assert "BUDGET EXCEEDED" in msg
+    assert allowed is True
+    assert "BUDGET ROLLOVER" in msg
+    assert (tmp_path / ".tokguard" / "handoff.md").exists()
+    assert list((tmp_path / ".tokguard" / "sessions").glob("session-*.json"))
+    assert get_status_line(tmp_path) == "[tg: 0/1.0k tokens used]"
 
-    # 4. Override bypasses hard stop
+    # 4. Recovery actions are always available at a full budget.
+    record_action("cmd:fill", "a" * 4000, root=tmp_path)
+    allowed_handoff, _ = check_guard("cmd:handoff", root=tmp_path)
+    assert allowed_handoff is True
     allowed_override, _ = check_guard("cmd:pytest4", override=True, root=tmp_path)
     assert allowed_override is True
 
