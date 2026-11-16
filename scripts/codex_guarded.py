@@ -9,11 +9,13 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import re
 import signal
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
 from typing import List, Optional
@@ -50,6 +52,8 @@ def run_guarded(
     task_desc: str,
     budget_limit: int,
     poll_interval: float = 0.05,
+    drift_interval: float = 5.0,
+    cwd: Optional[Path] = None,
 ) -> int:
     """Execute command, stream output, count tokens, kill process if budget exceeded."""
     print(f"[tokguard] Launching guarded execution with budget: {format_token_k(budget_limit)} tokens")
@@ -60,6 +64,7 @@ def run_guarded(
     reported_tokens: Optional[int] = None
     stop_triggered = False
 
+    task_root = Path(cwd or Path.cwd()).resolve()
     proc = subprocess.Popen(
         command_str,
         shell=True,
@@ -69,7 +74,26 @@ def run_guarded(
         encoding="utf-8",
         errors="replace",
         bufsize=1,
+        cwd=task_root,
+        start_new_session=os.name != "nt",
+        creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0,
     )
+
+    drift_stop = threading.Event()
+    drift_report: dict = {}
+
+    def watch_drift() -> None:
+        while not drift_stop.wait(max(0.1, drift_interval)):
+            report = _run_drift_check(task_root)
+            if report and report.get("level") == "OFF TRACK":
+                drift_report.update(report)
+                _terminate_process_tree(proc)
+                return
+
+    watcher = None
+    if (task_root / ".tokguard" / "task.json").exists():
+        watcher = threading.Thread(target=watch_drift, name="tokguard-drift", daemon=True)
+        watcher.start()
 
     captured_lines: List[str] = []
 
@@ -96,8 +120,8 @@ def run_guarded(
                 print("!" * 60 + "\n")
 
                 # Terminate subprocess
+                _terminate_process_tree(proc)
                 try:
-                    proc.terminate()
                     proc.wait(timeout=3)
                 except Exception:
                     proc.kill()
@@ -105,16 +129,25 @@ def run_guarded(
 
         proc.stdout.close()
         proc.wait()
+        drift_stop.set()
+        if watcher:
+            watcher.join(timeout=1)
     except KeyboardInterrupt:
         print("\n[tokguard] Interrupted by user.")
-        proc.kill()
+        drift_stop.set()
+        _terminate_process_tree(proc)
         return 130
 
+    stop_triggered = stop_triggered or bool(drift_report)
+
     final_tokens = reported_tokens if reported_tokens else estimate_tokens("".join(captured_lines))
-    record_action(f"guarded:{task_desc}", "".join(captured_lines))
+    record_action(f"guarded:{task_desc}", "".join(captured_lines), root=task_root)
 
     if stop_triggered:
-        handoff_path = generate_handoff(f"Interrupted by tokguard: {task_desc}")
+        summary = f"Interrupted by tokguard: {task_desc}"
+        if drift_report:
+            summary += "\nDrift report: " + json.dumps(drift_report, ensure_ascii=False, separators=(",", ":"))
+        handoff_path = generate_handoff(summary, root=task_root)
         print(f"[tokguard] Auto-generated emergency handoff: {handoff_path.as_posix()}")
         return 99
 
@@ -122,6 +155,45 @@ def run_guarded(
     print("-" * 60)
     print(f"[tokguard] Completed in {elapsed:.1f}s. Tokens consumed: ~{format_token_k(final_tokens)} ({final_tokens:,})")
     return proc.returncode
+
+
+def _terminate_process_tree(proc: subprocess.Popen) -> None:
+    try:
+        if os.name == "nt":
+            subprocess.run(["taskkill", "/PID", str(proc.pid), "/T", "/F"], capture_output=True, timeout=5)
+        else:
+            os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
+    except (OSError, subprocess.SubprocessError):
+        try:
+            proc.kill()
+        except OSError:
+            pass
+
+
+def _run_drift_check(cwd: Path) -> dict:
+    """Run the compact JSON drift check and tolerate its trailing status line."""
+    try:
+        env = os.environ.copy()
+        env["PYTHONPATH"] = os.pathsep.join(filter(None, [str(root_dir), env.get("PYTHONPATH", "")]))
+        result = subprocess.run(
+            [sys.executable, "-m", "tg.cli", "check", "--json"],
+            cwd=cwd,
+            env=env,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=15,
+        )
+        if result.returncode:
+            return {}
+        start = result.stdout.find("{")
+        if start < 0:
+            return {}
+        report, _ = json.JSONDecoder().raw_decode(result.stdout[start:])
+        return report if isinstance(report, dict) else {}
+    except (OSError, subprocess.SubprocessError, json.JSONDecodeError, ValueError):
+        return {}
 
 
 def main() -> int:

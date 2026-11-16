@@ -48,6 +48,41 @@ Optional Codex command with an external budget hard-stop:
 python -m scripts.codex_guarded "Refactor user authentication service"
 ```
 
+## Task manager and drift checks
+
+Lock the original request, submit a JSON work order, and follow its ordered steps:
+
+```bash
+tg plan --prompt "Fix input validation in src/core.py"
+tg plan --submit .tokguard/work-order.json
+tg check
+tg step show
+tg verify
+```
+
+The manager records a baseline, checks changed paths and work-order limits, reports drift with a correction, and blocks guarded tools when the task is off track. Log a justified expansion with `tg scope add <path> --reason "..."`; use `tg revert-plan` to see suggested recovery commands. `tg verify` runs the declared verification command and acceptance checks. Post-tool drift checks are advisory because Claude's `PostToolUse` event runs after the tool call.
+
+### Claude Code PostToolUse Claude Code settings.json hook snippet
+
+Add this to `~/.claude/settings.json` (Windows: `%USERPROFILE%\.claude\settings.json`) to check after edits, writes, and shell commands. Merge the `PostToolUse` entry with any hooks already configured:
+
+```json
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|Bash",
+        "hooks": [
+          { "type": "command", "command": "tg check --quiet" }
+        ]
+      }
+    ]
+  }
+}
+```
+
+The hook uses the installed `tg` command. Install globally with `npm install -g tokguard`, then restart Claude Code or confirm the settings reload. It does nothing when no task is locked.
+
 ---
 
 ## How Each Saving Works
@@ -78,9 +113,10 @@ python -m scripts.codex_guarded "Refactor user authentication service"
 
 ## Measured Benchmark Results
 
-Measured across 5 real coding tasks (bug fix, add function, cross-file rename, fix failing test, module explanation):
-- **Overall Token Reduction**: **62.5%** (5,227 -> 1,962 tokens)
+Measured with TokGuard's token estimator across 5 benchmark task fixtures (bug fix, add function, cross-file rename, failing test, module explanation):
+- **Overall Token Reduction**: **63.2%** (5,402 -> 1,988 estimated tokens in the latest run)
 - **Task Success Rate**: **100%** (5/5 tasks passed)
+- **Scope-creep checks**: **4/4 detected** (docs, dependency, feature, and test expansion)
 
 Run the benchmark anytime:
 ```bash

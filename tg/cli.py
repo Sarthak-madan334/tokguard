@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from pathlib import Path
 
@@ -19,6 +20,7 @@ from tg.map import find_symbol, generate_repo_map, read_range, read_symbol
 from tg.run import execute_and_compress
 from tg.slim import slim_file
 from tg.setup import setup_all
+from tg import manager
 
 DEFAULT_TGIGNORE = """# tokguard ignore list
 node_modules/
@@ -50,6 +52,9 @@ yarn.lock
 """
 
 AGENTS_MD_CONTENT = """# AGENTS.md - Context & Token Rules for tokguard
+- First action: `tg plan --prompt \"<original user prompt>\"`, then write and submit the work order as a senior tech manager.
+- Do only what the work order says. Obey every DRIFT message. Update scope only with a reason.
+- Finish only after `tg verify` PASS.
 - Search before reading: use `tg find <symbol>` or `rg` first; read only needed ranges (never whole files >200 lines).
 - Never re-read an unchanged file; remember contents or check `tg read` unchanged notice.
 - Run shell commands via `tg run -- <cmd>` for compressed output and raw log persistence.
@@ -94,7 +99,16 @@ def cmd_init() -> int:
 
     # 4. Print MCP snippets
     print(MCP_CONFIG_HELP)
+    record_action("cmd:init", "initialized project guidance and config")
+    print(get_status_line())
     return 0
+
+
+def cmd_setup() -> int:
+    code = setup_all()
+    record_action("cmd:setup", "configured agent MCP integrations")
+    print(get_status_line())
+    return code
 
 
 def cmd_run(args: argparse.Namespace) -> int:
@@ -214,9 +228,13 @@ def cmd_slim(args: argparse.Namespace) -> int:
     p = Path(args.file)
     if not p.exists():
         print(f"Error: file not found '{args.file}'")
+        record_action(f"cmd:slim:{args.file}", "file not found")
+        print(get_status_line())
         return 1
     res = slim_file(p)
     print(res)
+    record_action(f"cmd:slim:{args.file}", res, file_touched=args.file)
+    print(get_status_line())
     return 0
 
 
@@ -226,18 +244,21 @@ def cmd_budget(args: argparse.Namespace) -> int:
     if args.reset:
         reset_session()
         print("Session tokens and history reset to 0.")
+        record_action("cmd:budget --reset", "session reset")
         print(get_status_line())
         return 0
     if args.set is not None:
         cfg["session_token_budget"] = args.set
         save_config(cfg)
         print(f"Updated session_token_budget to {args.set}.")
+        record_action("cmd:budget --set", f"session token budget set to {args.set}")
         print(get_status_line())
         return 0
 
     print("--- tokguard Budget Config ---")
     for k, v in cfg.items():
         print(f"  {k}: {v}")
+    record_action("cmd:budget", json.dumps(cfg, sort_keys=True))
     print(f"Current Status: {get_status_line()}")
     return 0
 
@@ -246,9 +267,16 @@ def cmd_handoff(args: argparse.Namespace) -> int:
     """Generate session handoff file."""
     summary = " ".join(args.summary) if args.summary else "Agent task handoff"
     p = generate_handoff(summary)
-    print(f"Wrote session handoff to {p.as_posix()} (<= 30 lines)")
+    print(f"Wrote session handoff to {p.as_posix()}")
     print(p.read_text(encoding="utf-8"))
+    record_action("cmd:handoff", p.read_text(encoding="utf-8"))
+    print(get_status_line())
     return 0
+
+
+def _manager_status(action: str, output: str = "") -> None:
+    record_action(f"manager:{action}", output or action)
+    print(get_status_line())
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -263,13 +291,15 @@ def main(argv: list[str] | None = None) -> int:
     subparsers = parser.add_subparsers(dest="subcommand", help="Subcommand")
 
     # init
-    subparsers.add_parser("init", help="Initialize AGENTS.md, .tgignore and config")
+    init_parser = subparsers.add_parser("init", help="Initialize AGENTS.md, .tgignore and config")
+    init_parser.add_argument("--override", action="store_true")
 
     # setup
-    subparsers.add_parser(
+    setup_parser = subparsers.add_parser(
         "setup",
         help="Configure TokGuard globally for Codex, Claude Code and Antigravity",
     )
+    setup_parser.add_argument("--override", action="store_true")
 
     # run
     run_parser = subparsers.add_parser("run", help="Execute and compress command output")
@@ -299,15 +329,50 @@ def main(argv: list[str] | None = None) -> int:
     # slim
     slim_parser = subparsers.add_parser("slim", help="Strip comments and blank lines")
     slim_parser.add_argument("file", help="File to slim")
+    slim_parser.add_argument("--override", action="store_true")
 
     # budget
     budget_parser = subparsers.add_parser("budget", help="Inspect or adjust budget")
     budget_parser.add_argument("--reset", action="store_true", help="Reset session tokens and history")
     budget_parser.add_argument("--set", type=int, help="Set session_token_budget")
+    budget_parser.add_argument("--override", action="store_true")
 
     # handoff
     handoff_parser = subparsers.add_parser("handoff", help="Generate .tokguard/handoff.md")
     handoff_parser.add_argument("summary", nargs="*", help="Task summary")
+    handoff_parser.add_argument("--override", action="store_true")
+
+    # task manager
+    plan_parser = subparsers.add_parser("plan", help="Lock a prompt or submit its manager work order")
+    plan_parser.add_argument("--prompt", help="Lock the user's original prompt verbatim")
+    plan_parser.add_argument("--submit", help="Submit a JSON work order file, or - for stdin")
+    plan_parser.add_argument("--new", action="store_true", help="Archive and replace the existing task lock")
+    plan_parser.add_argument("--override", action="store_true")
+    check_parser = subparsers.add_parser("check", help="Measure task drift")
+    check_parser.add_argument("--json", action="store_true")
+    check_parser.add_argument("--quiet", action="store_true")
+    check_parser.add_argument("--override", action="store_true")
+    step_parser = subparsers.add_parser("step", help="Track work-order steps")
+    step_parser.add_argument("--override", action="store_true")
+    step_sub = step_parser.add_subparsers(dest="step_action", required=True)
+    done_parser = step_sub.add_parser("done")
+    done_parser.add_argument("id")
+    done_parser.add_argument("--note", default="")
+    step_sub.add_parser("show")
+    add_parser = step_sub.add_parser("add")
+    add_parser.add_argument("text")
+    add_parser.add_argument("--reason", required=True)
+    verify_parser = subparsers.add_parser("verify", help="Run the work-order verification")
+    verify_parser.add_argument("--override", action="store_true")
+    scope_parser = subparsers.add_parser("scope", help="Log a justified scope expansion")
+    scope_parser.add_argument("--override", action="store_true")
+    scope_sub = scope_parser.add_subparsers(dest="scope_action", required=True)
+    scope_add_parser = scope_sub.add_parser("add")
+    scope_add_parser.add_argument("path")
+    scope_add_parser.add_argument("--reason", required=True)
+    revert_parser = subparsers.add_parser("revert-plan", help="Print commands to revert out-of-scope files")
+    revert_parser.add_argument("--yes", action="store_true")
+    revert_parser.add_argument("--override", action="store_true")
 
     # Handle '--' in tg run
     # If "run" is the first arg and "--" appears, separate correctly
@@ -333,9 +398,60 @@ def main(argv: list[str] | None = None) -> int:
         parser.print_help()
         return 0
 
+    try:
+        blocked = manager.lockout_message()
+    except Exception:
+        blocked = ""
+    recovery = args.subcommand in {"check", "handoff", "revert-plan"}
+    recovery |= args.subcommand == "scope" and getattr(args, "scope_action", "") == "add"
+    recovery |= args.subcommand == "budget" and getattr(args, "reset", False)
+    recovery |= args.subcommand == "plan" and getattr(args, "new", False)
+    if blocked and not getattr(args, "override", False) and not recovery:
+        print(blocked)
+        return 1
+
+    if args.subcommand == "plan":
+        try:
+            if args.prompt is not None:
+                manager.lock_prompt(args.prompt, new=args.new)
+                _manager_status("plan_lock", "prompt locked")
+            elif args.submit:
+                source = sys.stdin.read() if args.submit == "-" else Path(args.submit).read_text(encoding="utf-8")
+                manager.submit_order(source, config=load_config())
+                _manager_status("plan_submit", "work order accepted")
+            else:
+                raise ValueError("use --prompt <text> or --submit <file|->")
+            return 0
+        except (ValueError, OSError, json.JSONDecodeError) as exc:
+            print(f"tg plan: {exc}", file=sys.stderr); _manager_status("plan_failed", str(exc)); return 2
+    if args.subcommand == "check":
+        try:
+            result = manager.check_drift()
+            manager.print_drift(result, args.json, args.quiet)
+            _manager_status("check", json.dumps(result, separators=(",", ":")))
+            return 0
+        except (ValueError, OSError) as exc:
+            print(f"tg check: {exc}", file=sys.stderr); _manager_status("check_failed", str(exc)); return 2
+    if args.subcommand == "step":
+        try:
+            if args.step_action == "done": manager.step_done(args.id, note=args.note)
+            elif args.step_action == "add": manager.add_step(args.text, args.reason)
+            else: manager.show_step()
+            _manager_status("step_" + args.step_action, args.id if args.step_action == "done" else getattr(args, "text", args.step_action))
+            return 0
+        except (ValueError, OSError) as exc:
+            print(f"tg step: {exc}", file=sys.stderr); _manager_status("step_failed", str(exc)); return 2
+    if args.subcommand == "verify":
+        code = manager.verify(); _manager_status("verify", f"exit={code}"); return code
+    if args.subcommand == "scope":
+        try: manager.scope_add(args.path, args.reason); _manager_status("scope_add", args.path); return 0
+        except (ValueError, OSError) as exc: print(f"tg scope: {exc}", file=sys.stderr); _manager_status("scope_failed", str(exc)); return 2
+    if args.subcommand == "revert-plan":
+        code = manager.revert_plan(execute=args.yes); _manager_status("revert_plan", f"execute={args.yes}"); return code
+
     dispatch = {
         "init": lambda a: cmd_init(),
-        "setup": lambda a: setup_all(),
+        "setup": lambda a: cmd_setup(),
         "run": cmd_run,
         "map": cmd_map,
         "find": cmd_find,
