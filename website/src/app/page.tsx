@@ -1,13 +1,17 @@
-import type { CSSProperties } from "react";
 import {
-  CinematicField,
   CopyCommand,
   MobileMenu,
-  MotionToggle,
   ProofScene,
   ScrollEffects,
-  WorkflowScene,
+  TerminalDemo,
 } from "./experience";
+
+const agents = [
+  { mark: "◈", name: "Codex", description: "Add TokGuard tools and repository guidance to your Codex workflow." },
+  { mark: "✳", name: "Claude Code", description: "Use compact maps, targeted reads, and quieter command output." },
+  { mark: "✦", name: "Antigravity", description: "Register TokGuard as an MCP server for your projects." },
+  { mark: "+", name: "Other MCP clients", description: "Connect from another client that supports the Model Context Protocol." },
+];
 
 function Logo() {
   return (
@@ -18,122 +22,216 @@ function Logo() {
   );
 }
 
-const agents = [
-  { initials: "◈", name: "Codex", type: "OPENAI CODING AGENT", body: "Connect TokGuard tools and repository guidance to Codex." },
-  { initials: "✳", name: "Claude Code", type: "ANTHROPIC CODING AGENT", body: "Use compact maps, targeted reads, and quieter command output." },
-  { initials: "✦", name: "Antigravity", type: "GOOGLE CODING AGENT", body: "Register TokGuard as an MCP server across your projects." },
-  { initials: "+", name: "MCP-compatible agents", type: "OPEN MCP SERVER", body: "Connect directly from another client that supports MCP." },
-];
-
 export default function Home() {
   return (
     <>
       <ScrollEffects />
       <a className="skip-link" href="#main">Skip to content</a>
+      <div className="announcement">
+        <p>Open source <span aria-hidden="true">·</span> Works with Codex, Claude Code, and Antigravity</p>
+        <a href="https://github.com/Sarthak-madan334/tokguard" target="_blank" rel="noreferrer">Visit GitHub <span aria-hidden="true">↗</span></a>
+      </div>
+
       <header className="site-header">
-        <div className="header-inner page-width">
+        <div className="page-width header-inner">
           <Logo />
           <nav className="desktop-nav" aria-label="Main navigation">
-            <a href="#idea">The idea</a><a href="#how">How it works</a><a href="#savings">The proof</a><a href="#agents">Agents</a>
+            <a href="#how">How it works</a><a href="#whats-new">TokGuard 2.0</a><a href="#results">Results</a><a href="#agents">Agents</a>
           </nav>
-          <a className="header-cta" href="#install">Get started <span aria-hidden="true">↗</span></a>
+          <a className="button button-primary header-cta" href="#install">Get started</a>
           <MobileMenu />
         </div>
       </header>
 
       <main id="main" tabIndex={-1}>
-        <section className="cinema-hero" id="top">
-          <CinematicField />
-          <div className="hero-scrim" aria-hidden="true" />
-          <div className="page-width hero-grid">
-            <div className="hero-content">
-              <div className="hero-kicker"><i /> OPEN-SOURCE CONTEXT TOOLKIT</div>
-              <h1>Less context.<br /><span>More coding.</span></h1>
-              <p className="hero-lede">TokGuard helps your coding agent find the right files, read only what matters, and keep command output under control.</p>
-              <div className="hero-buttons">
-                <a className="hero-action" href="#install">Set it up <span aria-hidden="true">↗</span></a>
-                <a className="text-link" href="#how">See how it works <span aria-hidden="true">↓</span></a>
-              </div>
-              <div className="hero-support"><span className="support-pulse" /> FOR CODEX · CLAUDE CODE · ANTIGRAVITY</div>
+        <section className="hero-section" id="top">
+          <div className="page-width hero-inner">
+            <p className="eyebrow">A calmer way to explore a codebase</p>
+            <h1>Less context.<br /><em>More coding.</em></h1>
+            <p className="hero-lede">TokGuard helps your coding agent find the right files, read only what matters, and keep command output under control.</p>
+            <div className="hero-actions">
+              <a className="button button-primary" href="#install">Set it up <span aria-hidden="true">↗</span></a>
+              <a className="button button-secondary" href="#how">See how it works <span aria-hidden="true">↓</span></a>
             </div>
-            <div className="hero-showcase" aria-label="TokGuard command-line preview">
-              <div className="hero-orbit orbit-a" /><div className="hero-orbit orbit-b" />
-              <div className="float-label float-label-a"><span>01</span> MAP THE REPO</div>
-              <div className="float-label float-label-b"><span>02</span> FIND A SYMBOL</div>
-              <div className="terminal-window">
-                <div className="terminal-top"><div className="window-lights"><i /><i /><i /></div><span className="terminal-title">tokguard / focused context</span><span className="terminal-live"><i /> LIVE</span></div>
-                <div className="terminal-content">
-                  <div className="terminal-cmd"><span>›</span> tg map</div>
-                  <div className="terminal-tree"><div className="tree-folder">src/</div><div className="tree-row"><span>├─ checkout.py</span><b>calculate_total()</b></div><div className="tree-row"><span>├─ cart.py</span><b>class Cart</b></div><div className="tree-row"><span>└─ inventory.py</span><b>check_stock()</b></div><div className="tree-more">… compact outline ready</div></div>
-                  <div className="terminal-rule" />
-                  <div className="terminal-cmd"><span>›</span> tg find calculate_total</div>
-                  <div className="terminal-result"><span className="result-mark">✓</span><div><b>src/checkout.py:42</b><small>1 match · 1 line of context</small></div><span className="result-open">↗</span></div>
-                  <div className="terminal-meter"><span>CONTEXT SPENT</span><div><i /><i /><i /><i /><i /><i /><i /><i /><i /><i /></div><b>focused</b></div>
-                </div>
-              </div>
-              <span className="hero-spark spark-1" aria-hidden="true">✳</span><span className="hero-spark spark-2" aria-hidden="true">✳</span><span className="hero-spark spark-3" aria-hidden="true">·</span>
+            <TerminalDemo />
+          </div>
+        </section>
+
+        <section className="idea-section section-pad" id="idea">
+          <div className="page-width idea-grid">
+            <div className="section-copy reveal">
+              <p className="eyebrow">A more focused starting point</p>
+              <h2>Your agent doesn’t need<br className="desktop-break" /> the whole repo.</h2>
+              <p>Large file dumps and noisy command output can fill a conversation with details the agent may not need. Repeated reads add more of the same.</p>
+              <p>TokGuard offers a compact map, targeted search, careful reads, and cleaner command results, so the conversation can stay focused on the task.</p>
+            </div>
+            <div className="context-card reveal" aria-label="Strong benchmark token comparison">
+              <div className="context-card-head"><span>Strong benchmark</span><span>Measured tokens</span></div>
+              <div className="bar-row"><div className="bar-label"><span>Without TokGuard</span><strong>47,383</strong></div><div className="bar-track"><span className="bar-full" /></div></div>
+              <div className="bar-row"><div className="bar-label"><span>With TokGuard</span><strong>17,295</strong></div><div className="bar-track"><span className="bar-focused" /></div></div>
+              <p className="context-caption">Token count calculated from the reported 63.5% reduction.</p>
             </div>
           </div>
-          <div className="hero-bottom page-width"><span>THE RIGHT CONTEXT, WITHOUT THE REPO DUMP</span><span className="scroll-thread" /><a href="#idea">SCROLL TO EXPLORE <span aria-hidden="true">↓</span></a></div>
         </section>
 
-        <div className="proof-ticker" aria-hidden="true"><div>MAP <i>✳</i> FIND <i>✳</i> READ <i>✳</i> RUN <i>✳</i> TRACK <i>✳</i> MAP <i>✳</i> FIND <i>✳</i> READ <i>✳</i> RUN <i>✳</i> TRACK <i>✳</i></div></div>
-
-        <section className="belief-section page-width" id="idea">
-          <div className="section-overline"><span>01</span><span>THE IDEA</span></div>
-          <div className="belief-grid reveal"><h2>Your agent doesn’t need<br />the <span>whole repo.</span></h2><div><p>Large file dumps and noisy command output fill a conversation with details the agent may not need. Repeated reads add more of the same.</p><p>TokGuard makes repository context smaller and more useful: a compact map, targeted search, careful reads, and cleaner command results.</p></div></div>
-          <div className="belief-ribbon"><span>LESS SCANNING</span><i>✳</i><span>BETTER SIGNAL</span><i>✳</i><span>MORE ROOM TO BUILD</span><i>✳</i><span>LESS SCANNING</span><i>✳</i><span>BETTER SIGNAL</span></div>
-        </section>
-
-        <section className="proof-section" id="proof">
+        <section className="how-section section-pad" id="how">
           <div className="page-width">
-            <div className="section-overline"><span>02</span><span>ONE TASK, FOLLOWED THROUGH</span></div>
-            <div className="section-intro reveal"><h2>See a task<br /><span>find its path.</span></h2><p>Instead of sweeping every file into the conversation, the agent can move from a small outline to one symbol and then a targeted read.</p></div>
+            <div className="section-heading reveal">
+              <p className="eyebrow">A task, followed through</p>
+              <h2>See a task find its path.</h2>
+              <p>Start with the request. Follow the useful context from a repository map to the implementation.</p>
+            </div>
             <ProofScene />
           </div>
         </section>
 
-        <section className="workflow-section page-width" id="how">
-          <div className="section-overline"><span>03</span><span>HOW TOKGUARD WORKS</span></div>
-          <div className="section-intro reveal"><h2>Follow the thread.<br /><span>Skip the noise.</span></h2><p>Four practical tools help the agent orient, inspect, and act without dragging the whole repository into every turn.</p></div>
-          <WorkflowScene />
-        </section>
-
-        <section className="benchmark-section" id="savings">
+        <section className="tools-section section-pad">
           <div className="page-width">
-            <div className="section-overline"><span>04</span><span>MEASURED IN A BENCHMARK</span></div>
-            <div className="benchmark-layout">
-              <div className="benchmark-copy reveal"><h2>More room<br />for the <span>work.</span></h2><p>Across five sample coding tasks, TokGuard reduced measured input tokens by about <strong>62.5%</strong>.</p><p className="benchmark-caveat">One benchmark, not a guarantee. Actual savings vary with the task, repository, and how the agent uses TokGuard.</p></div>
-              <div className="benchmark-card reveal" aria-label="Benchmark comparison: 5,227 baseline input tokens compared with 1,962 TokGuard input tokens">
-                <div className="benchmark-card-top"><span>INPUT TOKENS / 5 TASKS</span><span className="benchmark-tag">LOCAL BENCHMARK</span></div>
-                <div className="benchmark-result"><strong>−62.5<span>%</span></strong><span>approx. fewer input tokens</span></div>
-                <div className="bar-group"><div className="bar-label"><span>Baseline workflow</span><b>5,227</b></div><div className="bar-track"><i className="bar-baseline" /></div></div>
-                <div className="bar-group"><div className="bar-label"><span>With TokGuard</span><b>1,962</b></div><div className="bar-track"><i className="bar-tokguard" /></div></div>
-                <div className="benchmark-card-foot"><span>5 sample coding tasks · input tokens</span><a href="https://github.com/Sarthak-madan334/tokguard/tree/main/bench" target="_blank" rel="noreferrer">Explore benchmark ↗</a></div>
-              </div>
+            <div className="section-heading reveal">
+              <p className="eyebrow">Four tools, one workflow</p>
+              <h2>Just enough to keep moving.</h2>
+            </div>
+            <div className="tool-grid">
+              <article className="tool-card reveal"><span className="tool-icon" aria-hidden="true">⌘</span><h3>Map</h3><p>Get a compact outline of files and symbols before opening code.</p><code>tg map</code></article>
+              <article className="tool-card reveal"><span className="tool-icon" aria-hidden="true">⌕</span><h3>Find</h3><p>Locate a symbol or pattern and see a small amount of nearby context.</p><code>tg find calculate_total</code></article>
+              <article className="tool-card reveal"><span className="tool-icon" aria-hidden="true">↙</span><h3>Read</h3><p>Open a relevant line range or symbol body instead of a whole file.</p><code>tg read src/app.py 42-58</code></article>
+              <article className="tool-card reveal"><span className="tool-icon" aria-hidden="true">›_</span><h3>Run</h3><p>Filter progress noise and keep useful summaries and errors visible.</p><code>tg run -- pytest -q</code></article>
             </div>
           </div>
         </section>
 
-        <section className="agents-section page-width" id="agents">
-          <div className="section-overline"><span>05</span><span>MADE FOR CODING AGENTS</span></div>
-          <div className="section-intro reveal"><h2>One setup.<br /><span>Your usual tools.</span></h2><p>TokGuard connects through MCP and adds concise project guidance for compatible coding agents.</p></div>
-          <div className="agent-grid">{agents.map((agent, index) => <article className="agent-card reveal" key={agent.name} style={{ "--agent-order": index } as CSSProperties}><div className={`agent-symbol agent-symbol-${index}`} aria-hidden="true">{agent.initials}</div><div className="agent-copy"><span className="agent-type">{agent.type}</span><h3>{agent.name}</h3><p>{agent.body}</p><span className="agent-supported"><i /> SUPPORTED</span></div><span className="agent-arrow" aria-hidden="true">↗</span></article>)}</div>
+        <section className="release-section section-pad" id="whats-new">
+          <div className="page-width">
+            <div className="release-intro reveal">
+              <div>
+                <p className="eyebrow">A new chapter · TokGuard 2.0</p>
+                <h2>Keep the agent<br />with the task.</h2>
+                <p>TokGuard 2.0 brings planning, drift checks, verification, and automatic updates into the same focused workflow.</p>
+              </div>
+              <div className="release-stamp" aria-label="TokGuard version 2.0">
+                <span className="release-stamp-ring"><span>2.0</span></span>
+                <small>THE TASK, START TO FINISH</small>
+              </div>
+            </div>
+            <div className="release-grid">
+              <article className="release-card reveal">
+                <div className="release-card-top"><span>01 / PLAN</span><span aria-hidden="true">↗</span></div>
+                <h3>A task manager for the original request</h3>
+                <p>TokGuard locks the request, then helps the agent make a clear work order with scope, ordered steps, and checkable acceptance criteria.</p>
+                <div className="release-flow" aria-label="Prompt to work order to steps"><span>Prompt</span><i>→</i><span>Work order</span><i>→</i><span>Steps</span></div>
+              </article>
+              <article className="release-card reveal">
+                <div className="release-card-top"><span>02 / DRIFT</span><span aria-hidden="true">⌁</span></div>
+                <h3>Notice scope drift as it happens</h3>
+                <p>Baseline-aware checks compare changes with the approved scope and steps. When work drifts, TokGuard explains why and points the agent back.</p>
+                <div className="release-status"><span className="release-status-dot" /> Scope check <strong>ON TRACK</strong></div>
+              </article>
+              <article className="release-card reveal">
+                <div className="release-card-top"><span>03 / FINISH</span><span aria-hidden="true">✓</span></div>
+                <h3>Verify, hand off, keep going</h3>
+                <p>Run the declared verification and acceptance checks. When a session budget fills, TokGuard saves context and rolls into a fresh session.</p>
+                <div className="release-checks"><span><b>✓</b> Acceptance</span><span><b>✓</b> Verification</span><span><b>↻</b> Handoff</span></div>
+              </article>
+              <article className="release-card release-card-update reveal">
+                <div className="release-card-top"><span>04 / STAY CURRENT</span><span aria-hidden="true">↻</span></div>
+                <h3>Automatic updates at launch</h3>
+                <p>With TokGuard 2.0.1, a global install checks npm when it starts. If a newer release is available, it updates and resumes your command. <code>npx tokguard@latest</code> already requests the latest release.</p>
+                <div className="release-update-note">Older global installs need one update to 2.0.1 to receive the updater.</div>
+              </article>
+            </div>
+          </div>
         </section>
 
-        <section className="install-section page-width" id="install">
-          <div className="install-panel reveal"><div className="install-constellation" aria-hidden="true"><i /><i /><i /><i /><i /><i /><i /><i /><i /><svg viewBox="0 0 500 500"><path d="M45 335 150 220l77 41 112-140 106 160"/><path d="m150 220 48-110 100 10"/></svg></div><div className="install-content"><div className="section-overline"><span>06</span><span>GET STARTED</span></div><h2>Put your context<br />on a <span>diet.</span></h2><p>One PowerShell command installs the TokGuard MCP connection and the guidance your agents need.</p><div className="install-command"><div><span>POWERSHELL</span><code>npx -y tokguard@latest setup</code></div><CopyCommand command="npx -y tokguard@latest setup" /></div><div className="install-after"><span>Then restart your coding agent.</span><a href="https://github.com/Sarthak-madan334/tokguard" target="_blank" rel="noreferrer">View source on GitHub ↗</a></div></div></div>
-          <div className="install-steps"><article><span>01</span><div><b>Run the command</b><p>Use PowerShell from any folder.</p></div></article><article><span>02</span><div><b>Restart the agent</b><p>TokGuard appears in its available tools.</p></div></article><article><span>03</span><div><b>Start with a map</b><p>Ask the agent to map the repository first.</p></div></article></div>
-          <div className="global-install"><span>Prefer a global command?</span><code>npm install -g tokguard@latest</code><span>then run <code>tokguard setup</code></span></div>
+        <section className="results-section section-pad" id="results">
+          <div className="page-width results-grid">
+            <div className="result-stat reveal"><p className="eyebrow">Strong benchmark</p><p className="stat-value">−63.5%</p><p>fewer input tokens used with TokGuard</p></div>
+            <div className="result-detail reveal">
+              <h2>More room<br />for the work.</h2>
+              <div className="benchmark-card">
+                <div className="benchmark-bar-row"><div><span>Without TokGuard</span><strong>47,383 tokens</strong></div><div className="benchmark-track"><i className="benchmark-before" /></div></div>
+                <div className="benchmark-bar-row"><div><span>With TokGuard</span><strong>17,295 tokens</strong></div><div className="benchmark-track"><i className="benchmark-after" /></div></div>
+              </div>
+              <p className="benchmark-method">8–10 repositories · 10 tasks per repository · 5 runs per task · 800–1,000 total runs across two modes</p>
+              <a className="text-link" href="https://github.com/Sarthak-madan334/tokguard/tree/main/bench" target="_blank" rel="noreferrer">Explore the benchmark <span aria-hidden="true">↗</span></a>
+            </div>
+          </div>
         </section>
 
-        <section className="limits-section page-width">
-          <div className="section-overline"><span>07</span><span>HONEST LIMITS</span></div>
-          <div className="limits-grid reveal"><h2>Smaller context.<br /><span>Clear expectations.</span></h2><div><p>TokGuard reduces unnecessary repository and command output. It can’t control hidden model reasoning, and savings depend on the agent following its instructions.</p><a href="https://github.com/Sarthak-madan334/tokguard#known-limits" target="_blank" rel="noreferrer">Read project notes <span aria-hidden="true">↗</span></a></div></div>
+        <section className="agents-section section-pad" id="agents">
+          <div className="page-width">
+            <div className="section-heading reveal">
+              <p className="eyebrow">One setup, familiar tools</p>
+              <h2>One setup. Your usual tools.</h2>
+              <p>Connect TokGuard to the coding agent you already use.</p>
+            </div>
+            <div className="agent-grid">
+              {agents.map((agent) => <article className="agent-card reveal" key={agent.name}>
+                <span className="agent-mark" aria-hidden="true">{agent.mark}</span>
+                <h3>{agent.name}</h3><p>{agent.description}</p>
+                <a href="#install">See setup steps <span aria-hidden="true">↗</span></a>
+              </article>)}
+            </div>
+          </div>
         </section>
+
+        <section className="compare-section section-pad">
+          <div className="page-width">
+            <div className="section-heading reveal"><p className="eyebrow">A useful distinction</p><h2>Why not just grep?</h2><p>Each tool has a place. TokGuard helps shape what an agent receives across a few common repository tasks.</p></div>
+            <div className="comparison-wrap reveal">
+              <table className="comparison-table">
+                <caption>What each approach typically returns to a coding conversation</caption>
+                <thead><tr><th scope="col">Approach</th><th scope="col">What it returns</th><th scope="col">Context size</th></tr></thead>
+                <tbody>
+                  <tr><th scope="row">grep / ripgrep</th><td>Matching lines from a search pattern</td><td>Depends on the match and command options</td></tr>
+                  <tr><th scope="row">Agent built-in search</th><td>Search results chosen by the client</td><td>Varies by agent and configuration</td></tr>
+                  <tr className="comparison-highlight"><th scope="row">TokGuard</th><td>Repo maps, focused matches and reads, filtered command output</td><td>Designed to keep results targeted</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <section className="install-section section-pad" id="install">
+          <div className="page-width install-grid">
+            <div className="install-copy reveal">
+              <p className="eyebrow">Start in a minute</p>
+              <h2>Put TokGuard to work.</h2>
+              <p>Run setup in PowerShell, restart your coding agent, then start with a map of the repository.</p>
+              <ol className="install-steps">
+                <li><span>1</span><div><strong>Run the command</strong><p>Setup adds TokGuard’s MCP connection and guidance.</p></div></li>
+                <li><span>2</span><div><strong>Restart your agent</strong><p>Let it load the updated configuration.</p></div></li>
+                <li><span>3</span><div><strong>Start with a map</strong><p>Ask your agent to run <code>tg map</code>.</p></div></li>
+              </ol>
+            </div>
+            <div className="install-panel reveal">
+              <div className="install-panel-head"><span>PowerShell</span><span>Recommended</span></div>
+              <div className="install-command"><code>npx -y tokguard@latest setup</code><CopyCommand command="npx -y tokguard@latest setup" /></div>
+              <div className="global-install"><p>Prefer a global install?</p><code>npm install -g tokguard@latest</code><br /><code>tokguard setup</code></div>
+              <p className="install-note">Setup updates agent MCP configuration and guidance files on your machine. Your repository stays on your machine. Setup is documented for PowerShell. For other shells, see the <a href="https://github.com/Sarthak-madan334/tokguard#installation" target="_blank" rel="noreferrer">README</a>.</p>
+            </div>
+          </div>
+        </section>
+
+        <section className="limits-section section-pad">
+          <div className="page-width limits-card reveal">
+            <div><p className="eyebrow">Clear expectations</p><h2>Smaller context.<br />Clear expectations.</h2></div>
+            <div><p>TokGuard reduces unnecessary repository and command output. It can’t control hidden model reasoning, and savings depend on the agent following its instructions.</p><a className="text-link" href="https://github.com/Sarthak-madan334/tokguard#known-limits" target="_blank" rel="noreferrer">Read the known limits <span aria-hidden="true">↗</span></a></div>
+          </div>
+        </section>
+
       </main>
 
-      <footer className="site-footer"><div className="footer-main page-width"><Logo /><span>Less context. More room to think.</span><nav aria-label="Footer navigation"><a href="#how">How it works</a><a href="#savings">Savings</a><a href="#install">Install</a><a href="https://github.com/Sarthak-madan334/tokguard" target="_blank" rel="noreferrer">GitHub ↗</a></nav><MotionToggle /></div><div className="footer-bottom page-width"><span>© 2026 TokGuard</span><span>Open source · Your repository stays on your machine</span></div></footer>
+      <footer className="site-footer">
+        <div className="page-width">
+          <div className="footer-grid">
+            <div className="footer-brand"><Logo /><p>Focused context for coding agents.</p></div>
+            <div><h2>Product</h2><a href="#how">How it works</a><a href="#results">Results</a><a href="#agents">Agents</a></div>
+            <div><h2>Docs &amp; community</h2><a href="https://github.com/Sarthak-madan334/tokguard" target="_blank" rel="noreferrer">GitHub repository</a><a href="https://github.com/Sarthak-madan334/tokguard/issues" target="_blank" rel="noreferrer">Issues and support</a><a href="https://github.com/Sarthak-madan334/tokguard/tree/main/bench" target="_blank" rel="noreferrer">Benchmark</a></div>
+            <div><h2>Legal</h2><a href="https://github.com/Sarthak-madan334/tokguard/blob/main/package.json" target="_blank" rel="noreferrer">MIT license</a></div>
+          </div>
+          <div className="footer-bottom"><Logo /><p>© 2026 TokGuard. Open source.</p></div>
+        </div>
+      </footer>
     </>
   );
 }
