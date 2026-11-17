@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+from pathlib import Path
 
 import pytest
 
@@ -121,6 +122,29 @@ def test_non_git_baseline_hashes_repository_files(tmp_path, monkeypatch):
     data = json.loads(lock.read_text(encoding="utf-8"))
     assert "src/main.py" in data["baseline_snapshot"]
     assert ".tokguard/task.lock.json" not in data["baseline_snapshot"]
+
+
+def test_planning_fallback_snapshot_prunes_generated_directories(tmp_path, monkeypatch):
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "main.py").write_text("print('hi')\n", encoding="utf-8")
+    generated = tmp_path / "node_modules" / "large-package" / "dist"
+    generated.mkdir(parents=True)
+    (generated / "bundle.js").write_text("generated\n", encoding="utf-8")
+
+    visited = []
+    original_walk = manager.os.walk
+
+    def recording_walk(*args, **kwargs):
+        for directory, dirs, files in original_walk(*args, **kwargs):
+            visited.append(Path(directory).relative_to(tmp_path).as_posix())
+            yield directory, dirs, files
+
+    monkeypatch.setattr(manager.os, "walk", recording_walk)
+    snapshot = manager._fallback_snapshot(tmp_path)
+
+    assert "src/main.py" in snapshot
+    assert not any(name.startswith("node_modules") for name in snapshot)
+    assert not any(name.startswith("node_modules") for name in visited)
 
 
 def test_ambiguous_prompt_requires_explicit_assumptions(tmp_path):
