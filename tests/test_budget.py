@@ -5,6 +5,7 @@ from tg.budget import (
     estimate_tokens,
     format_token_k,
     load_config,
+    load_session,
     save_config,
     record_action,
     check_guard,
@@ -27,42 +28,25 @@ def test_format_token_k():
     assert format_token_k(150000) == "150k"
 
 
-def test_budget_warning_and_automatic_rollover(tmp_path):
-    # Set small budget for testing
+def test_large_token_usage_never_warns_or_rolls_over(tmp_path):
+    # Old limit settings must be ignored when loading existing config.
     cfg = load_config(tmp_path)
-    cfg["session_token_budget"] = 1000  # 1000 tokens
+    cfg["session_token_budget"] = 1000
     cfg["warn_at"] = 0.5
     cfg["hard_stop_at"] = 1.0
     save_config(cfg, tmp_path)
 
-    # 1. Below warning
-    record_action("cmd:pytest", "a" * 1600, root=tmp_path)  # 400 tokens = 40%
-    allowed, msg = check_guard("cmd:pytest2", root=tmp_path)
+    record_action("cmd:large-output", "a" * 40000, root=tmp_path)
+    allowed, msg = check_guard("cmd:next-action", root=tmp_path)
+
     assert allowed is True
     assert msg is None
-
-    # 2. At or above warn_at (50%)
-    record_action("cmd:pytest2", "a" * 800, root=tmp_path)  # +200 tokens = 600 total (60%)
-    allowed, msg = check_guard("cmd:pytest3", root=tmp_path)
-    assert allowed is True
-    assert msg is not None
-    assert "BUDGET WARNING" in msg
-
-    # 3. At or above hard_stop_at, preserve a handoff and roll to a fresh ledger.
-    record_action("cmd:pytest3", "a" * 1800, root=tmp_path)  # +450 tokens = 1050 total (105%)
-    allowed, msg = check_guard("cmd:pytest4", root=tmp_path)
-    assert allowed is True
-    assert "BUDGET ROLLOVER" in msg
-    assert (tmp_path / ".tokguard" / "handoff.md").exists()
-    assert list((tmp_path / ".tokguard" / "sessions").glob("session-*.json"))
-    assert get_status_line(tmp_path) == "[tg: 0/1.0k tokens | drift -- | step 0/0]"
-
-    # 4. Recovery actions are always available at a full budget.
-    record_action("cmd:fill", "a" * 4000, root=tmp_path)
-    allowed_handoff, _ = check_guard("cmd:handoff", root=tmp_path)
-    assert allowed_handoff is True
-    allowed_override, _ = check_guard("cmd:pytest4", override=True, root=tmp_path)
-    assert allowed_override is True
+    assert "session_token_budget" not in load_config(tmp_path)
+    assert load_session(tmp_path)["cumulative_tokens"] >= 10000
+    assert "BUDGET WARNING" not in get_status_line(tmp_path)
+    assert "/" not in get_status_line(tmp_path).split("tokens", 1)[0]
+    assert not (tmp_path / ".tokguard" / "handoff.md").exists()
+    assert not (tmp_path / ".tokguard" / "sessions").exists()
 
 
 def test_loop_detection(tmp_path):
@@ -89,6 +73,8 @@ def test_generate_handoff(tmp_path):
     lines = content.splitlines()
     assert len(lines) <= 30
     assert "tokguard Session Handoff" in content
+    assert "Tokens Consumed" in content
+    assert "/150k" not in content
     assert "Fix authentication timeout bug" in content
     assert "app/main.py" in content
 

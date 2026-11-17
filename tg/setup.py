@@ -18,7 +18,7 @@ _GUIDANCE = (
     "Do only what the work order says. Obey every DRIFT message. Update scope only with a reason.\n"
     "Finish only after `tg verify` PASS.\n"
     "Map first with `tg map`; search with `tg find`; read only targeted ranges or symbols.\n"
-    "Use `tg run -- <command>` for shell commands and keep outputs tiny. At the session limit, continue after automatic handoff and rollover."
+    "Use `tg run -- <command>` for shell commands and keep outputs tiny."
 )
 
 

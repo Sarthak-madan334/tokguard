@@ -8,9 +8,6 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 DEFAULT_CONFIG = {
-    "session_token_budget": 150000,
-    "warn_at": 0.7,
-    "hard_stop_at": 1.0,
     "drift_thresholds": {"minor": 21, "major": 46, "off": 71},
     "check_every_n_calls": 8,
     "max_files_changed": 8,
@@ -51,6 +48,8 @@ def load_config(root: Path = Path(".")) -> dict:
             data = json.loads(cfg_path.read_text(encoding="utf-8"))
             merged = dict(DEFAULT_CONFIG)
             merged.update(data)
+            for obsolete in ("session_token_budget", "warn_at", "hard_stop_at"):
+                merged.pop(obsolete, None)
             return merged
         except Exception:
             pass
@@ -102,10 +101,10 @@ def record_action(
     output_text: str,
     root: Path = Path("."),
     file_touched: Optional[str] = None,
-) -> Tuple[int, int]:
+) -> int:
     """
     Record an action and its output tokens in session.
-    Returns (used_tokens, budget).
+    Returns cumulative estimated tokens for informational reporting.
     """
     session = load_session(root)
     cfg = load_config(root)
@@ -134,7 +133,7 @@ def record_action(
                 checkpoint(root, action_key, session["manager_call_count"])
         except (OSError, ValueError, json.JSONDecodeError):
             pass
-    return session["cumulative_tokens"], cfg["session_token_budget"]
+    return session["cumulative_tokens"]
 
 
 def check_guard(
@@ -143,13 +142,11 @@ def check_guard(
     root: Path = Path("."),
 ) -> Tuple[bool, Optional[str]]:
     """
-    Check loop detection and budget constraints.
+    Check task lockout and repeated-action loops.
     Returns (allowed, optional_message).
     If allowed is False, command should be blocked.
     """
     session = load_session(root)
-    cfg = load_config(root)
-
     recovery = (
         action_key in {"cmd:handoff", "mcp:check", "mcp:handoff", "mcp:revert-plan", "check", "handoff", "revert-plan"}
         or action_key.startswith(("cmd:budget --reset", "mcp:scope_add:", "scope:add:"))
@@ -165,36 +162,12 @@ def check_guard(
     except (OSError, ValueError, json.JSONDecodeError):
         pass
 
-    used = session.get("cumulative_tokens", 0)
-    budget = cfg.get("session_token_budget", 150000)
-    ratio = used / float(budget) if budget > 0 else 0.0
-
-    # 1. Hard stop check
-    hard_stop = cfg.get("hard_stop_at", 1.0)
-    if ratio >= hard_stop:
-        # Save context and roll over instead of permanently locking the CLI.
-        handoff = generate_handoff("Automatic TokGuard budget rollover", root=root)
-        import time
-        state = root / ".tokguard"
-        archive = state / "sessions"
-        archive.mkdir(parents=True, exist_ok=True)
-        stamp = f"{time.strftime('%Y%m%dT%H%M%SZ', time.gmtime())}-{time.time_ns()}"
-        (state / "session.json").replace(archive / f"session-{stamp}.json")
-        reset_session(root=root)
-        return True, f"BUDGET ROLLOVER: handoff saved to {handoff.as_posix()}; session archived.\n{get_status_line(root)}"
-
-    # 2. Loop detection check
+    # Loop detection is advisory and never blocks the agent.
     history: List[str] = session.get("history", [])
     # Check if this exact action repeated 3+ times in recent history
     recent = history[-6:]
     if recent.count(action_key) >= 3 and not override:
         msg = f"LOOP DETECTED: change approach (action repeated {recent.count(action_key)} times)\n"
-        return True, msg
-
-    # 3. Budget warning check
-    warn_at = cfg.get("warn_at", 0.7)
-    if ratio >= warn_at:
-        msg = f"BUDGET WARNING: nearing session token limit ({format_token_k(used)}/{format_token_k(budget)})"
         return True, msg
 
     return True, None
@@ -203,9 +176,7 @@ def check_guard(
 def get_status_line(root: Path = Path(".")) -> str:
     """Return compact session, drift, and step status."""
     session = load_session(root)
-    cfg = load_config(root)
     used = session.get("cumulative_tokens", 0)
-    budget = cfg.get("session_token_budget", 150000)
     detail = "drift -- | step 0/0"
     if (root / ".tokguard" / "task.json").exists():
         try:
@@ -218,7 +189,7 @@ def get_status_line(root: Path = Path(".")) -> str:
             detail = f"drift {result['score']} {level} | step {len(done)}/{len(order['steps'])}"
         except Exception:
             pass
-    status = f"[tg: {format_token_k(used)}/{format_token_k(budget)} tokens | {detail}]"
+    status = f"[tg: {format_token_k(used)} tokens | {detail}]"
     try:
         from tg.manager import consume_checkpoint_notice
         notice = consume_checkpoint_notice(root)
@@ -232,9 +203,7 @@ def get_status_line(root: Path = Path(".")) -> str:
 def generate_handoff(task_summary: str = "In-progress task", root: Path = Path(".")) -> Path:
     """Generate .tokguard/handoff.md under 30 lines for fresh session continuation."""
     session = load_session(root)
-    cfg = load_config(root)
     used = session.get("cumulative_tokens", 0)
-    budget = cfg.get("session_token_budget", 150000)
     files = session.get("files_touched", [])
     history = session.get("history", [])[-5:]
 
@@ -244,7 +213,7 @@ def generate_handoff(task_summary: str = "In-progress task", root: Path = Path("
     lines: List[str] = [
         "# tokguard Session Handoff",
         f"- **Task**: {task_summary}",
-        f"- **Tokens Consumed**: {format_token_k(used)} / {format_token_k(budget)} ({int((used/budget)*100)}%)",
+        f"- **Tokens Consumed**: {format_token_k(used)}",
         "- **Files Touched**:",
     ]
     if files:
@@ -262,7 +231,7 @@ def generate_handoff(task_summary: str = "In-progress task", root: Path = Path("
         "  1. Review raw logs in `.tokguard/raw/` if debugging previous test/command failure.",
         "  2. Consult `tg map` or `tg find` for unresolved symbols.",
         "  3. Execute required changes and verify using `tg run -- <test_command>`.",
-        "  4. Reset budget for new session via `tg budget --reset`.",
+        "  4. Reset session usage for an unrelated task via `tg budget --reset`.",
     ])
 
     try:

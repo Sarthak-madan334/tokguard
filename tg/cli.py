@@ -51,7 +51,7 @@ yarn.lock
 *.tar.*
 """
 
-AGENTS_MD_CONTENT = """# AGENTS.md - Context & Token Rules for tokguard
+AGENTS_MD_CONTENT = """# AGENTS.md - Context & Workflow Rules for tokguard
 - First action: `tg plan --prompt \"<original user prompt>\"`, then write and submit the work order as a senior tech manager.
 - Do only what the work order says. Obey every DRIFT message. Update scope only with a reason.
 - Finish only after `tg verify` PASS.
@@ -61,8 +61,6 @@ AGENTS_MD_CONTENT = """# AGENTS.md - Context & Token Rules for tokguard
 - Batch independent commands into a single execution step.
 - Replies: terse. No restating code just written, no diff recaps, no pleasantries. Output unified diffs, not full files. Ask no unnecessary confirmation questions.
 - Do not explore the repo broadly; start from `tg map`.
-- When `tg` reports BUDGET WARNING, keep tool output compact and continue the active task.
-- At the session limit, TokGuard writes a handoff, archives the old ledger, and rolls over automatically. Continue from the handoff; `tg handoff` and `tg budget --reset` always remain available.
 """
 
 MCP_CONFIG_HELP = """
@@ -239,7 +237,7 @@ def cmd_slim(args: argparse.Namespace) -> int:
 
 
 def cmd_budget(args: argparse.Namespace) -> int:
-    """Inspect or alter budget settings."""
+    """Inspect or reset session usage."""
     cfg = load_config()
     if args.reset:
         reset_session()
@@ -247,15 +245,7 @@ def cmd_budget(args: argparse.Namespace) -> int:
         record_action("cmd:budget --reset", "session reset")
         print(get_status_line())
         return 0
-    if args.set is not None:
-        cfg["session_token_budget"] = args.set
-        save_config(cfg)
-        print(f"Updated session_token_budget to {args.set}.")
-        record_action("cmd:budget --set", f"session token budget set to {args.set}")
-        print(get_status_line())
-        return 0
-
-    print("--- tokguard Budget Config ---")
+    print("--- tokguard Session Config ---")
     for k, v in cfg.items():
         print(f"  {k}: {v}")
     record_action("cmd:budget", json.dumps(cfg, sort_keys=True))
@@ -306,25 +296,25 @@ def main(argv: list[str] | None = None) -> int:
     run_parser.add_argument("--max-lines", type=int, default=120, help="Max lines of output")
     run_parser.add_argument("--max-chars", type=int, default=6000, help="Max characters of output")
     run_parser.add_argument("--full", action="store_true", help="Bypass compression")
-    run_parser.add_argument("--override", action="store_true", help="Override budget hard stop")
+    run_parser.add_argument("--override", action="store_true", help="Override task drift lockout")
     run_parser.add_argument("cmd", nargs=argparse.REMAINDER, help="Command to execute")
 
     # map
     map_parser = subparsers.add_parser("map", help="Display repo symbol outline map")
-    map_parser.add_argument("--override", action="store_true", help="Override budget limit")
+    map_parser.add_argument("--override", action="store_true", help="Override task drift lockout")
 
     # find
     find_parser = subparsers.add_parser("find", help="Find symbol or pattern")
     find_parser.add_argument("query", help="Symbol or regex to search")
     find_parser.add_argument("--max", type=int, default=20, help="Max results")
-    find_parser.add_argument("--override", action="store_true", help="Override budget limit")
+    find_parser.add_argument("--override", action="store_true", help="Override task drift lockout")
 
     # read
     read_parser = subparsers.add_parser("read", help="Read range or symbol from file")
     read_parser.add_argument("file", help="File to read")
     read_parser.add_argument("range", nargs="?", help="Start-end line range, e.g. 10-40")
     read_parser.add_argument("--symbol", help="Read specific symbol body")
-    read_parser.add_argument("--override", action="store_true", help="Override budget limit")
+    read_parser.add_argument("--override", action="store_true", help="Override task drift lockout")
 
     # slim
     slim_parser = subparsers.add_parser("slim", help="Strip comments and blank lines")
@@ -332,10 +322,8 @@ def main(argv: list[str] | None = None) -> int:
     slim_parser.add_argument("--override", action="store_true")
 
     # budget
-    budget_parser = subparsers.add_parser("budget", help="Inspect or adjust budget")
+    budget_parser = subparsers.add_parser("budget", help="Inspect or reset session usage")
     budget_parser.add_argument("--reset", action="store_true", help="Reset session tokens and history")
-    budget_parser.add_argument("--set", type=int, help="Set session_token_budget")
-    budget_parser.add_argument("--override", action="store_true")
 
     # handoff
     handoff_parser = subparsers.add_parser("handoff", help="Generate .tokguard/handoff.md")

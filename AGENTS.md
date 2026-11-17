@@ -8,6 +8,4 @@
 - Finish only after `tg verify` PASS.
 - Batch calls: combine independent shell commands into a single execution step.
 - Replies: terse. No restating code just written, no recaps of diffs, no pleasantries. Show unified diffs, never full files. Ask no unnecessary confirmation questions.
-- Budget Warning: keep TokGuard output compact and continue the active task.
-- Budget Rollover: TokGuard saves a handoff, archives the old ledger, and starts a fresh session automatically; continue from the handoff. `tg handoff` and `tg budget --reset` remain available at all times.
 
