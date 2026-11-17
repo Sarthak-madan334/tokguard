@@ -6,6 +6,7 @@ import difflib
 import fnmatch
 import hashlib
 import json
+import os
 import re
 import subprocess
 import time
@@ -44,14 +45,16 @@ def _tracked_snapshot(root: Path) -> dict[str, str]:
 def _fallback_snapshot(root: Path) -> dict[str, str]:
     excluded = {".git", ".tokguard", "node_modules", ".venv", "venv", "dist", "build", "__pycache__", ".next"}
     result = {}
-    for path in root.rglob("*"):
-        if not path.is_file() or any(part in excluded for part in path.relative_to(root).parts):
-            continue
-        try:
-            rel = path.relative_to(root).as_posix()
-            result[rel] = hashlib.sha256(path.read_bytes()).hexdigest()
-        except OSError:
-            continue
+    for directory, dirs, files in os.walk(root, topdown=True):
+        dirs[:] = [name for name in dirs if name not in excluded]
+        base = Path(directory)
+        for name in files:
+            path = base / name
+            try:
+                rel = path.relative_to(root).as_posix()
+                result[rel] = hashlib.sha256(path.read_bytes()).hexdigest()
+            except OSError:
+                continue
     return result
 
 
