@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""External token-guarded wrapper for Codex CLI (and any agent execution).
+"""Drift-aware wrapper for Codex CLI (and any agent execution).
 
 Usage:
     python -m scripts.codex_guarded "Implement user authentication"
-    python scripts/codex_guarded.py --budget 50000 -- "codex exec 'refactor db'"
+    python scripts.codex_guarded.py --cmd "codex exec 'refactor db'"
 """
 
 from __future__ import annotations
@@ -29,7 +29,6 @@ from tg.budget import (
     estimate_tokens,
     format_token_k,
     generate_handoff,
-    load_config,
     record_action,
 )
 
@@ -50,19 +49,16 @@ def parse_usage_line(line: str) -> Optional[int]:
 def run_guarded(
     command_str: str,
     task_desc: str,
-    budget_limit: int,
     poll_interval: float = 0.05,
     drift_interval: float = 5.0,
     cwd: Optional[Path] = None,
 ) -> int:
-    """Execute command, stream output, count tokens, kill process if budget exceeded."""
-    print(f"[tokguard] Launching guarded execution with budget: {format_token_k(budget_limit)} tokens")
+    """Run a command to completion while watching for task drift."""
+    print("[tokguard] Launching drift-aware execution (no token limit)")
     print(f"[tokguard] Command: {command_str}\n" + ("=" * 60))
 
     start_time = time.time()
-    accumulated_chars = 0
     reported_tokens: Optional[int] = None
-    stop_triggered = False
 
     task_root = Path(cwd or Path.cwd()).resolve()
     proc = subprocess.Popen(
@@ -103,29 +99,10 @@ def run_guarded(
             sys.stdout.write(line)
             sys.stdout.flush()
             captured_lines.append(line)
-            accumulated_chars += len(line)
 
-            # Check if line reported token count
             reported = parse_usage_line(line)
             if reported:
                 reported_tokens = reported
-
-            current_tokens = reported_tokens if reported_tokens else estimate_tokens("".join(captured_lines))
-
-            if current_tokens >= budget_limit:
-                stop_triggered = True
-                print("\n" + "!" * 60)
-                print(f"[tokguard] HARD STOP TRIGGERED: Reached {format_token_k(current_tokens)} / {format_token_k(budget_limit)} tokens!")
-                print("[tokguard] Terminating process immediately to prevent runaway cost...")
-                print("!" * 60 + "\n")
-
-                # Terminate subprocess
-                _terminate_process_tree(proc)
-                try:
-                    proc.wait(timeout=3)
-                except Exception:
-                    proc.kill()
-                break
 
         proc.stdout.close()
         proc.wait()
@@ -138,12 +115,10 @@ def run_guarded(
         _terminate_process_tree(proc)
         return 130
 
-    stop_triggered = stop_triggered or bool(drift_report)
-
     final_tokens = reported_tokens if reported_tokens else estimate_tokens("".join(captured_lines))
     record_action(f"guarded:{task_desc}", "".join(captured_lines), root=task_root)
 
-    if stop_triggered:
+    if drift_report:
         summary = f"Interrupted by tokguard: {task_desc}"
         if drift_report:
             summary += "\nDrift report: " + json.dumps(drift_report, ensure_ascii=False, separators=(",", ":"))
@@ -197,14 +172,11 @@ def _run_drift_check(cwd: Path) -> dict:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="External budget guard for Codex and coding agents.")
+    parser = argparse.ArgumentParser(description="Run a command while watching TokGuard task drift.")
     parser.add_argument("task", nargs="*", help="Task description or command")
-    parser.add_argument("--budget", type=int, help="Override token budget for this run")
     parser.add_argument("--cmd", help="Explicit command to execute (defaults to: codex exec '<task>')")
 
     args = parser.parse_args()
-    cfg = load_config()
-    budget = args.budget or cfg.get("session_token_budget", 150000)
 
     task_str = " ".join(args.task) if args.task else "Guarded task"
 
@@ -220,7 +192,7 @@ def main() -> int:
     else:
         cmd = 'codex exec "Perform requested task"'
 
-    return run_guarded(cmd, task_str, budget)
+    return run_guarded(cmd, task_str)
 
 
 if __name__ == "__main__":

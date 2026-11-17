@@ -50,11 +50,13 @@ $env:TOKGUARD_AUTO_UPDATE = "0"
 
 `tg init` adds repository-specific instructions, `.tgignore`, and `.tokguard/config.json` without replacing existing files.
 
-Optional Codex command with an external budget hard-stop:
+Optional Codex command with task-drift monitoring (token thresholds are not enforced):
 
 ```powershell
 python -m scripts.codex_guarded "Refactor user authentication service"
 ```
+
+This runner never terminates a command for token usage; it retains the separate task-drift monitor.
 
 ## Task manager and drift checks
 
@@ -110,12 +112,11 @@ The hook uses the installed `tg` command. Install globally with `npm install -g 
 - **Raw Log grep**: Full uncompressed output is saved to `.tokguard/raw/<timestamp>.log` so agents can grep specific lines rather than rerunning commands.
 - **Terse Rules**: `AGENTS.md` instructs models to emit concise diffs rather than entire updated files.
 
-### 3. Budget Guard & Circuit Breaker
-- **Session Tracking**: Tracks cumulative tokens in `.tokguard/session.json`, appending `[tg: 84k/150k tokens used]` to every command.
-- **Warning Threshold (`warn_at: 0.7`)**: Alerts agent to wrap up in <=10 lines when budget reaches 70%.
-- **Hard Stop (`hard_stop_at: 1.0`)**: Refuses command execution once budget is exhausted (bypassable only via `--override`).
-- **Loop Detection**: Blocks commands or identical file ranges requested 3+ times consecutively.
-- **`tg handoff`**: Automatically generates `.tokguard/handoff.md` (<=30 lines) containing touched files and remaining steps so a fresh session can resume cheaply.
+### 3. Session Usage & Loop Detection
+- **Usage Tracking**: Tracks estimated token use and action history in `.tokguard/session.json`; status shows usage without a token threshold.
+- **No Token Stops**: Token usage never warns, resets the ledger, or terminates a command.
+- **Loop Detection**: Reports repeated actions so the agent can choose a different approach.
+- **`tg handoff`**: Manually generates `.tokguard/handoff.md` (<=30 lines) containing touched files and remaining steps for session continuation.
 
 ---
 
@@ -137,5 +138,5 @@ python bench/runner.py
 
 - **Internal Model Reasoning**: Tokguard cannot intercept or compress hidden chain-of-thought or reasoning tokens generated natively inside models.
 - **Agent Compliance**: In non-MCP environments, token savings depend on the agent respecting instructions in `AGENTS.md` / `CLAUDE.md`.
-- **Session Boundaries**: Sessions are local to `.tokguard/session.json`; run `tg budget --reset` when starting a completely unrelated project task.
+- **Session Boundaries**: Usage history is local to `.tokguard/session.json`; run `tg budget --reset` when starting a completely unrelated project task.
 
