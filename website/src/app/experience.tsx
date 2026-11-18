@@ -54,17 +54,16 @@ export function TerminalDemo() {
 
 export function ProofScene() {
   const [active, setActive] = useState(0);
-  const [replay, setReplay] = useState(0);
   const current = proofSteps[active];
   return (
     <div className="proof-scene reveal">
       <div className="proof-prompt"><p className="eyebrow">The task</p><p>“Find where the total is calculated and inspect the implementation.”</p><span>One request. A few focused steps.</span></div>
       <div className="proof-workflow">
-        <div className="proof-heading"><span>Follow the context</span><button type="button" className="replay-button" onClick={() => { setActive(0); setReplay((value) => value + 1); }} aria-label="Replay the workflow">Replay <span aria-hidden="true">↻</span></button></div>
+        <div className="proof-heading"><span>Follow the context</span></div>
         <div className="proof-tabs" role="tablist" aria-label="Workflow steps">
           {proofSteps.map((step, index) => <button type="button" role="tab" id={`proof-tab-${step.key}`} aria-controls="proof-panel" aria-selected={active === index} tabIndex={active === index ? 0 : -1} key={step.key} onClick={() => setActive(index)}>{step.title}</button>)}
         </div>
-        <div className="proof-panel" role="tabpanel" id="proof-panel" aria-labelledby={`proof-tab-${current.key}`} key={replay}>
+        <div className="proof-panel" role="tabpanel" id="proof-panel" aria-labelledby={`proof-tab-${current.key}`}>
           {proofSteps.map((step, index) => <article className={`proof-step-row ${active === index ? "active" : ""}`} key={step.key}>
             <span className="proof-step-icon" aria-hidden="true">{active === index ? "✓" : "↳"}</span>
             <div className="proof-step-content"><div className="proof-step-title"><strong>{step.title}</strong><code>{step.command}</code></div><pre>{step.output}</pre><p>{step.note}</p></div>
