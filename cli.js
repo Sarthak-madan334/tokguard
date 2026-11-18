@@ -3,7 +3,7 @@
 const { spawn, execSync } = require('child_process');
 const path = require('path');
 const fs = require('fs');
-const { maybeAutoUpdate } = require('./lib/auto-update');
+const { maybeAutoUpdate, isWithin } = require('./lib/auto-update');
 
 const rootDir = __dirname;
 
@@ -30,8 +30,32 @@ function findPython() {
   return 'python';
 }
 
-const pythonBin = findPython();
 const args = process.argv.slice(2);
+
+if (args[0] === 'uninstall') {
+  let globalRoot;
+  try {
+    globalRoot = execSync('npm root -g', { encoding: 'utf8', timeout: 10000 }).trim();
+  } catch (_) {
+    process.stderr.write('[tokguard] Could not locate the global npm package directory.\n');
+    process.exit(1);
+  }
+
+  if (!isWithin(globalRoot, rootDir)) {
+    process.stderr.write('[tokguard] This command removes a global install only. For a local install, run `npm uninstall tokguard` in that project.\n');
+    process.exit(1);
+  }
+
+  try {
+    execSync('npm uninstall --global tokguard', { stdio: 'inherit' });
+    process.stdout.write('[tokguard] Uninstalled globally. Project files, .tokguard data, and assistant settings were left untouched.\n');
+  } catch (_) {
+    process.exitCode = 1;
+  }
+  process.exit(process.exitCode || 0);
+}
+
+const pythonBin = findPython();
 const updateExitCode = maybeAutoUpdate({ rootDir, args });
 if (updateExitCode !== null) process.exit(updateExitCode);
 

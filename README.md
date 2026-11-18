@@ -38,6 +38,16 @@ For a one-time `npx` setup, use the latest release directly:
 npx -y tokguard@latest setup
 ```
 
+### Uninstall TokGuard
+
+Remove a global npm installation with:
+
+```powershell
+tg uninstall
+```
+
+This removes the global TokGuard package. It leaves project files created by `tg init`, `.tokguard` data, and assistant settings from `tg setup` untouched. For a project-local npm installation, run `npm uninstall tokguard` from that project.
+
 ### Automatic updates
 
 A global `tg` or `tokguard` command checks npm at startup, installs a newer release when available, then reruns the original command. If npm is offline or the install lacks permission, TokGuard continues with the installed version. The configured MCP launch also uses `tokguard@latest`, so it picks up releases when the assistant starts the server again. To disable the global CLI update check for a PowerShell session:
