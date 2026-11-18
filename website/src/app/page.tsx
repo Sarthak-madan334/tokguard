@@ -227,7 +227,7 @@ export default function Home() {
             <div className="footer-brand"><Logo /><p>Focused context for coding agents.</p></div>
             <div><h2>Product</h2><a href="#how">How it works</a><a href="#results">Results</a><a href="#agents">Agents</a></div>
             <div><h2>Docs &amp; community</h2><a href="https://github.com/Sarthak-madan334/tokguard" target="_blank" rel="noreferrer">GitHub repository</a><a href="https://github.com/Sarthak-madan334/tokguard/issues" target="_blank" rel="noreferrer">Issues and support</a><a href="https://github.com/Sarthak-madan334/tokguard/tree/main/bench" target="_blank" rel="noreferrer">Benchmark</a></div>
-            <div><h2>Legal</h2><a href="https://github.com/Sarthak-madan334/tokguard/blob/main/package.json" target="_blank" rel="noreferrer">MIT license</a></div>
+            <div><h2>Legal</h2><a href="/privacy">Privacy policy</a><a href="https://github.com/Sarthak-madan334/tokguard/blob/main/package.json" target="_blank" rel="noreferrer">MIT license</a></div>
           </div>
           <div className="footer-bottom"><Logo /><p>© 2026 TokGuard. Open source.</p></div>
         </div>
