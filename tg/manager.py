@@ -96,6 +96,10 @@ def lock_prompt(prompt: str, root: Path = Path("."), new: bool = False, announce
         sidecar = state / "task.lock.sha256"
         if sidecar.exists():
             sidecar.replace(archive / f"task.lock.{stamp}.sha256")
+        for name in ("task.json", "task.md", "step.json", "scope.json", "step-changes.json", "drift.json"):
+            previous = state / name
+            if previous.exists():
+                previous.replace(archive / f"{previous.stem}.{stamp}{previous.suffix}")
     status = _status(root)
     dirty = [name for _, name in status]
     head = _git(root, "rev-parse", "HEAD")
@@ -189,6 +193,10 @@ def submit_order(source: str, root: Path = Path("."), config: dict[str, Any] | N
     if len(lines) > 40:
         raise ValueError("work order exceeds the 40-line limit")
     (state / "task.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    session_path = state / "session.json"
+    session = json.loads(session_path.read_text(encoding="utf-8")) if session_path.exists() else {}
+    step_state = {"done": [], "history_index": len(session.get("history", []))}
+    (state / "step.json").write_text(json.dumps(step_state, indent=2) + "\n", encoding="utf-8")
     if announce:
         print(f"Work order accepted: {len(order['steps'])} steps; {len(lines)} lines")
     return state / "task.md"
@@ -295,7 +303,10 @@ def check_drift(root: Path = Path("."), history: bool = True) -> dict[str, Any]:
     reasons: list[str] = []
     signals: dict[str, Any] = {}
     score = 0
-    outside = [p for p in changed if not _matches(p, order["in_scope"])]
+    # Paths named as expected outputs are explicit work-order scope too. Keep
+    # them aligned with the paths used by the recent-read drift check below.
+    scope_patterns = [*order["in_scope"], *_step_file_paths(order)]
+    outside = [p for p in changed if not _matches(p, scope_patterns)]
     if outside:
         points = min(50, 30 + 5 * len(outside)); score += points
         signals["outside_scope"] = {"points": points, "files": outside}
@@ -342,7 +353,8 @@ def check_drift(root: Path = Path("."), history: bool = True) -> dict[str, Any]:
     if first_pending and stalled_calls >= stall_calls:
         score += 15; signals["stall"] = {"points": 15, "calls": stalled_calls, "limit": stall_calls}
         reasons.append(f"no step progress in {stalled_calls} TokGuard calls")
-    repeated = [key for key in set(history_rows[-max(stall_calls, 6):]) if history_rows[-max(stall_calls, 6):].count(key) >= 3]
+    task_history = history_rows[step_index:]
+    repeated = [key for key in set(task_history[-max(stall_calls, 6):]) if task_history[-max(stall_calls, 6):].count(key) >= 3]
     if repeated:
         score += 12; signals["repeated_action"] = {"points": 12, "actions": repeated[:3]}
         reasons.append("same command or read repeated 3+ times: " + ", ".join(repeated[:3]))
@@ -361,7 +373,7 @@ def check_drift(root: Path = Path("."), history: bool = True) -> dict[str, Any]:
     recent_unrelated = []
     expected_files = _step_file_paths(order)
     known_paths = set(_git(root, "ls-files").splitlines()) | set(changed) | baseline_dirty
-    recent = history_rows[-stall_calls:]
+    recent = task_history[-stall_calls:]
     for action in recent:
         touched = [p for p in known_paths if p and p in action]
         for path in touched:

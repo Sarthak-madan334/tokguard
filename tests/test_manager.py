@@ -74,6 +74,43 @@ def test_prompt_lock_is_verbatim_immutable_and_archivable(tmp_path):
     assert list((tmp_path / ".tokguard" / "archive").glob("task.lock.*.json"))
 
 
+def test_new_prompt_archives_and_resets_previous_work_order_state(tmp_path):
+    git_repo(tmp_path)
+    manager.lock_prompt(PROMPT, tmp_path, announce=False)
+    manager.submit_order(json.dumps(make_order()), tmp_path, announce=False)
+    state = tmp_path / ".tokguard"
+    (state / "step.json").write_text(json.dumps({"done": ["one"]}), encoding="utf-8")
+    (state / "scope.json").write_text(json.dumps([{"path": "src/", "reason": "approved"}]), encoding="utf-8")
+    (state / "step-changes.json").write_text(json.dumps([{"step": "old step"}]), encoding="utf-8")
+    (state / "drift.json").write_text(json.dumps([{"score": 35}]), encoding="utf-8")
+
+    manager.lock_prompt("Start a different task.", tmp_path, new=True, announce=False)
+
+    assert not any((state / name).exists() for name in ("task.json", "task.md", "step.json", "scope.json", "step-changes.json", "drift.json"))
+    archive = state / "archive"
+    assert list(archive.glob("task.*.json"))
+    assert list(archive.glob("step.*.json"))
+    assert list(archive.glob("scope.*.json"))
+    assert list(archive.glob("drift.*.json"))
+    assert list(archive.glob("step-changes.*.json"))
+
+
+def test_new_work_order_ignores_prior_task_actions_for_stall_and_repeat_signals(tmp_path):
+    git_repo(tmp_path)
+    manager.lock_prompt(PROMPT, tmp_path, announce=False)
+    state = tmp_path / ".tokguard"
+    old_actions = ["mcp:step:done"] * 20
+    (state / "session.json").write_text(json.dumps({"history": old_actions}), encoding="utf-8")
+    manager.submit_order(json.dumps(make_order()), tmp_path, announce=False)
+
+    step = json.loads((state / "step.json").read_text(encoding="utf-8"))
+    result = manager.check_drift(tmp_path, history=False)
+
+    assert step["history_index"] == len(old_actions)
+    assert "stall" not in result["signals"]
+    assert "repeated_action" not in result["signals"]
+
+
 def test_submit_rejects_vague_or_uncheckable_orders(tmp_path):
     manager.lock_prompt(PROMPT, tmp_path)
     vague = make_order()
@@ -165,6 +202,21 @@ def test_out_of_scope_change_scores_major_signal_and_level(tmp_path):
     assert result["signals"]["outside_scope"]["points"] >= 30
     assert result["level"] == "MINOR DRIFT"
     assert "outside.py" in result["reasons"][0]
+
+
+def test_expected_step_file_is_in_scope_when_scope_text_is_not_a_glob(tmp_path):
+    order = make_order()
+    order["in_scope"] = ["the files explicitly named in the implementation steps"]
+    order["steps"][1]["expected"] = "src/authorized.py updated"
+    prepared_repo(tmp_path, order)
+    target = tmp_path / "src" / "authorized.py"
+    target.parent.mkdir()
+    target.write_text("print('authorized')\n", encoding="utf-8")
+
+    result = manager.check_drift(tmp_path, history=False)
+
+    assert result["outside_scope"] == []
+    assert "outside_scope" not in result["signals"]
 
 
 def test_protected_paths_and_file_and_diff_limits_score(tmp_path):
