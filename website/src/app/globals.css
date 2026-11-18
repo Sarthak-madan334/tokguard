@@ -86,10 +86,10 @@ code { overflow-wrap: anywhere; }
 .motion-ready .terminal-card:not(.visible) .terminal-output .terminal-command,
 .motion-ready .terminal-card:not(.visible) .terminal-output .terminal-result { clip-path: inset(0 100% 0 0); }
 .motion-ready .terminal-card.visible .terminal-output .terminal-command,
-.motion-ready .terminal-card.visible .terminal-output .terminal-result { animation: reveal-lines 1.6s steps(24, end) both; }
-.motion-ready .terminal-card.visible .terminal-output .terminal-result { animation-delay: .8s; }
-.motion-ready .terminal-card.visible .terminal-output .terminal-command:nth-of-type(3) { animation-delay: 1.6s; }
-.motion-ready .terminal-card.visible .terminal-output .terminal-last { animation-delay: 2.4s; }
+.motion-ready .terminal-card.visible .terminal-output .terminal-result { animation: reveal-lines 1.18s steps(24, end) both; }
+.motion-ready .terminal-card.visible .terminal-output .terminal-result { animation-delay: .05s; }
+.motion-ready .terminal-card.visible .terminal-output .terminal-command:nth-of-type(2) { animation-delay: .23s; }
+.motion-ready .terminal-card.visible .terminal-output .terminal-last { animation-delay: .28s; }
 @keyframes reveal-lines { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
 
 .idea-section { background: var(--surface-2); }
@@ -132,9 +132,9 @@ code { overflow-wrap: anywhere; }
 .proof-step-title code { color: var(--text-muted); font-size: 14px; overflow-wrap: anywhere; }
 .proof-panel pre { margin: 0 0 8px; border-radius: var(--input-radius); padding: 13px; background: var(--code-bg); color: var(--code-text); font-size: 14px; line-height: 1.6; white-space: pre-wrap; }
 .motion-ready .proof-scene:not(.visible) .proof-panel pre { clip-path: inset(0 100% 0 0); }
-.motion-ready .proof-scene.visible .proof-panel pre { animation: reveal-lines 1.3s steps(20, end) both; }
-.motion-ready .proof-scene.visible .proof-step-row:nth-of-type(2) pre { animation-delay: .8s; }
-.motion-ready .proof-scene.visible .proof-step-row:nth-of-type(3) pre { animation-delay: 1.6s; }
+.motion-ready .proof-scene.visible .proof-panel pre { animation: reveal-lines 1.22s steps(20, end) both; }
+.motion-ready .proof-scene.visible .proof-step-row:nth-of-type(2) pre { animation-delay: .16s; }
+.motion-ready .proof-scene.visible .proof-step-row:nth-of-type(3) pre { animation-delay: .32s; }
 .proof-panel p { margin: 0; color: var(--text-muted); font-size: 14px; }
 .proof-disclaimer { margin: 15px 0 0; color: var(--text-muted); font-size: 14px; }
 
