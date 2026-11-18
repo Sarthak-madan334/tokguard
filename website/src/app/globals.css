@@ -85,10 +85,13 @@ code { overflow-wrap: anywhere; }
 .terminal-result span:not(.terminal-success) { color: #F3B89D; }
 .terminal-success { color: #B8CFAF; }
 .terminal-last { margin-bottom: 0; }
-.terminal-output .terminal-command, .terminal-output .terminal-result { animation: reveal-lines .72s steps(24, end) both; }
-.terminal-output .terminal-result { animation-delay: .12s; }
-.terminal-output .terminal-command:nth-of-type(3) { animation-delay: .35s; }
-.terminal-output .terminal-last { animation-delay: .48s; }
+.motion-ready .terminal-card:not(.visible) .terminal-output .terminal-command,
+.motion-ready .terminal-card:not(.visible) .terminal-output .terminal-result { clip-path: inset(0 100% 0 0); }
+.motion-ready .terminal-card.visible .terminal-output .terminal-command,
+.motion-ready .terminal-card.visible .terminal-output .terminal-result { animation: reveal-lines 1.3s steps(24, end) both; }
+.motion-ready .terminal-card.visible .terminal-output .terminal-result { animation-delay: .8s; }
+.motion-ready .terminal-card.visible .terminal-output .terminal-command:nth-of-type(3) { animation-delay: 1.6s; }
+.motion-ready .terminal-card.visible .terminal-output .terminal-last { animation-delay: 2.4s; }
 @keyframes reveal-lines { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
 
 .idea-section { background: var(--surface-2); }

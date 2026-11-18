@@ -39,11 +39,10 @@ export function CopyCommand({ command }: { command: string }) {
 }
 
 export function TerminalDemo() {
-  const [replay, setReplay] = useState(0);
   return (
     <div className="terminal-card reveal" aria-label="TokGuard terminal example">
-      <div className="terminal-heading"><div><span className="terminal-dot" aria-hidden="true" /><span>TokGuard in a repository</span></div><button type="button" className="replay-button" onClick={() => setReplay((value) => value + 1)} aria-label="Replay terminal example">Replay <span aria-hidden="true">↻</span></button></div>
-      <div className="terminal-output" key={replay}>
+      <div className="terminal-heading"><div><span className="terminal-dot" aria-hidden="true" /><span>TokGuard in a repository</span></div></div>
+      <div className="terminal-output">
         <p className="terminal-command"><span aria-hidden="true">›</span> tg map</p>
         <pre className="terminal-result">tg/map.py <span>generate_repo_map(), find_symbol()</span><br />tg/cli.py <span>cmd_map(), cmd_find(), cmd_read()</span></pre>
         <p className="terminal-command"><span aria-hidden="true">›</span> tg find generate_repo_map</p>
