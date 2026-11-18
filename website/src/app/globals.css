@@ -76,8 +76,6 @@ code { overflow-wrap: anywhere; }
 .terminal-heading { display: flex; min-height: 54px; align-items: center; justify-content: space-between; gap: 16px; border-bottom: 1px solid rgba(245,244,238,.14); padding: 8px 22px; color: #C8C5BC; font-size: 14px; }
 .terminal-heading > div { display: flex; align-items: center; gap: 10px; }
 .terminal-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--accent); }
-.replay-button { display: inline-flex; min-height: 40px; align-items: center; gap: 8px; border: 1px solid rgba(245,244,238,.24); border-radius: var(--pill); padding: 7px 13px; background: transparent; color: var(--code-text); cursor: pointer; font-size: 14px; }
-.replay-button:hover { background: rgba(245,244,238,.1); }
 .terminal-output { padding: 22px clamp(18px, 4vw, 36px) 26px; }
 .terminal-command { margin: 0 0 10px; color: var(--code-text); font-family: "DM Mono", monospace; font-size: 15px; }
 .terminal-command > span, .proof-command > span { color: var(--accent); }
@@ -88,7 +86,7 @@ code { overflow-wrap: anywhere; }
 .motion-ready .terminal-card:not(.visible) .terminal-output .terminal-command,
 .motion-ready .terminal-card:not(.visible) .terminal-output .terminal-result { clip-path: inset(0 100% 0 0); }
 .motion-ready .terminal-card.visible .terminal-output .terminal-command,
-.motion-ready .terminal-card.visible .terminal-output .terminal-result { animation: reveal-lines 1.3s steps(24, end) both; }
+.motion-ready .terminal-card.visible .terminal-output .terminal-result { animation: reveal-lines 1.6s steps(24, end) both; }
 .motion-ready .terminal-card.visible .terminal-output .terminal-result { animation-delay: .8s; }
 .motion-ready .terminal-card.visible .terminal-output .terminal-command:nth-of-type(3) { animation-delay: 1.6s; }
 .motion-ready .terminal-card.visible .terminal-output .terminal-last { animation-delay: 2.4s; }
@@ -132,7 +130,11 @@ code { overflow-wrap: anywhere; }
 .proof-step-title { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 12px; margin-bottom: 9px; }
 .proof-step-title strong { font-size: 14px; }
 .proof-step-title code { color: var(--text-muted); font-size: 14px; overflow-wrap: anywhere; }
-.proof-panel pre { margin: 0 0 8px; border-radius: var(--input-radius); padding: 13px; background: var(--code-bg); color: var(--code-text); font-size: 14px; line-height: 1.6; white-space: pre-wrap; animation: reveal-lines .5s steps(20, end) both; }
+.proof-panel pre { margin: 0 0 8px; border-radius: var(--input-radius); padding: 13px; background: var(--code-bg); color: var(--code-text); font-size: 14px; line-height: 1.6; white-space: pre-wrap; }
+.motion-ready .proof-scene:not(.visible) .proof-panel pre { clip-path: inset(0 100% 0 0); }
+.motion-ready .proof-scene.visible .proof-panel pre { animation: reveal-lines 1.3s steps(20, end) both; }
+.motion-ready .proof-scene.visible .proof-step-row:nth-of-type(2) pre { animation-delay: .8s; }
+.motion-ready .proof-scene.visible .proof-step-row:nth-of-type(3) pre { animation-delay: 1.6s; }
 .proof-panel p { margin: 0; color: var(--text-muted); font-size: 14px; }
 .proof-disclaimer { margin: 15px 0 0; color: var(--text-muted); font-size: 14px; }
 
@@ -143,7 +145,8 @@ code { overflow-wrap: anywhere; }
 .release-intro > div:first-child > p:last-child { max-width: 62ch; margin: 0; color: var(--text-muted); font-size: 17px; line-height: 1.65; }
 .release-stamp { display: flex; align-items: center; justify-content: flex-end; gap: 15px; padding-bottom: 5px; color: var(--text-muted); }
 .release-stamp-ring { position: relative; display: grid; width: 104px; aspect-ratio: 1; place-items: center; border: 1px solid var(--border); border-radius: 50%; color: var(--accent); box-shadow: inset 0 0 0 8px rgba(255,255,255,.025), 0 12px 35px rgba(0,0,0,.18); }
-.release-stamp-ring::before { position: absolute; inset: 8px; border: 1px dashed rgba(225,177,109,.45); border-radius: 50%; content: ""; animation: release-turn 24s linear infinite; }
+.release-stamp-ring::before { position: absolute; inset: 8px; border: 1px dashed rgba(225,177,109,.45); border-radius: 50%; content: ""; }
+.motion-ready .release-intro.visible .release-stamp-ring::before { animation: release-turn 24s linear infinite; }
 .release-stamp-ring span { font-family: Georgia, "Times New Roman", serif; font-size: 35px; letter-spacing: -.06em; }
 .release-stamp small { max-width: 100px; font-size: 14px; letter-spacing: .08em; line-height: 1.45; }
 .release-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
@@ -248,7 +251,7 @@ code { overflow-wrap: anywhere; }
 .footer-bottom p { margin: 0; color: var(--text-muted); font-size: 14px; }
 
 .motion-ready .reveal:not(.visible) { opacity: 0; transform: translateY(8px); }
-.reveal { transition: opacity 260ms ease, transform 260ms ease; }
+.reveal { transition: opacity 800ms ease, transform 800ms ease; }
 .motion-ready .reveal.visible { opacity: 1; transform: translateY(0); }
 
 @media (max-width: 900px) {
@@ -334,8 +337,8 @@ code { overflow-wrap: anywhere; }
 .tool-grid .tool-card:nth-child(3), .agent-grid .agent-card:nth-child(3) { transition-delay: 110ms; }
 .tool-grid .tool-card:nth-child(4), .agent-grid .agent-card:nth-child(4) { transition-delay: 165ms; }
 .tool-card, .agent-card { transition: transform 220ms ease, border-color 220ms ease, box-shadow 220ms ease; }
-.result-stat.visible .stat-value { animation: stat-emerge 620ms cubic-bezier(.2,.75,.25,1) both; }
-.result-detail.visible .benchmark-track i, .context-card.visible .bar-track span { animation: bar-grow 850ms cubic-bezier(.2,.7,.25,1) both; transform-origin: left center; }
+.result-stat.visible .stat-value { animation: stat-emerge 1s cubic-bezier(.2,.75,.25,1) both; }
+.result-detail.visible .benchmark-track i, .context-card.visible .bar-track span { animation: bar-grow 1.2s cubic-bezier(.2,.7,.25,1) both; transform-origin: left center; }
 .result-detail.visible .benchmark-after, .context-card.visible .bar-focused { animation-delay: 140ms; }
 @keyframes stat-emerge { from { opacity: 0; transform: translateY(16px) scale(.92); filter: blur(5px); } to { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); } }
 @keyframes bar-grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
