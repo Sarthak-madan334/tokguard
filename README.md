@@ -46,7 +46,7 @@ Remove a global npm installation with:
 tg uninstall
 ```
 
-This removes the global TokGuard package. It leaves project files created by `tg init`, `.tokguard` data, and assistant settings from `tg setup` untouched. For a project-local npm installation, run `npm uninstall tokguard` from that project.
+This removes the global npm package and leaves project files created by `tg init`, `.tokguard` data, and assistant settings from `tg setup` untouched. For a project-local install, run `npm uninstall tokguard` from that project.
 
 ### Automatic updates
 
