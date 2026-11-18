@@ -208,6 +208,12 @@ export default function Home() {
               <div className="install-command"><code>npx -y tokguard@latest setup</code><CopyCommand command="npx -y tokguard@latest setup" /></div>
               <div className="global-install"><p>Prefer a global install?</p><code>npm install -g tokguard@latest</code><br /><code>tokguard setup</code></div>
               <p className="install-note">Setup updates agent MCP configuration and guidance files on your machine. Your repository stays on your machine. Setup is documented for PowerShell. For other shells, see the <a href="https://github.com/Sarthak-madan334/tokguard#installation" target="_blank" rel="noreferrer">README</a>.</p>
+              <div className="global-install">
+                <p>Uninstall TokGuard</p>
+                <code>tg uninstall</code>
+                <p>Removes the global npm package and leaves project files created by <code>tg init</code>, <code>.tokguard</code> data, and assistant settings from <code>tg setup</code> untouched.</p>
+                <p>For a project-local install, run <code>npm uninstall tokguard</code> from that project.</p>
+              </div>
             </div>
           </div>
         </section>
