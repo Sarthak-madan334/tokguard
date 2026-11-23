@@ -7,10 +7,10 @@ import {
 } from "./experience";
 
 const agents = [
-  { mark: "◈", name: "Codex", description: "Add TokGuard tools and repository guidance to your Codex workflow." },
-  { mark: "✳", name: "Claude Code", description: "Use compact maps, targeted reads, and quieter command output." },
-  { mark: "✦", name: "Antigravity", description: "Register TokGuard as an MCP server for your projects." },
-  { mark: "+", name: "Other MCP clients", description: "Connect from another client that supports the Model Context Protocol." },
+  { icon: "/agent-icons/codex.svg", name: "Codex", description: "Add TokGuard tools and repository guidance to your Codex workflow." },
+  { icon: "/agent-icons/claude.svg", name: "Claude Code", description: "Use compact maps, targeted reads, and quieter command output." },
+  { icon: "/agent-icons/antigravity.svg", name: "Antigravity", description: "Register TokGuard as an MCP server for your projects." },
+  { icon: "/agent-icons/mcp.svg", name: "Other MCP clients", description: "Connect from another client that supports the Model Context Protocol." },
 ];
 
 function Logo() {
@@ -166,7 +166,7 @@ export default function Home() {
             </div>
             <div className="agent-grid">
               {agents.map((agent) => <article className="agent-card reveal" key={agent.name}>
-                <span className="agent-mark" aria-hidden="true">{agent.mark}</span>
+                <span className="agent-mark" aria-hidden="true"><img src={agent.icon} alt="" /></span>
                 <h3>{agent.name}</h3><p>{agent.description}</p>
                 <a href="#install">See setup steps <span aria-hidden="true">↗</span></a>
               </article>)}

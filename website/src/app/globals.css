@@ -197,6 +197,7 @@ code { overflow-wrap: anywhere; }
 .agent-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
 .agent-card { display: flex; min-height: 260px; flex-direction: column; align-items: flex-start; border: 1px solid var(--border); border-radius: var(--card-radius); padding: 24px; background: var(--surface); box-shadow: var(--shadow); }
 .agent-mark { display: grid; width: 42px; height: 42px; place-items: center; margin-bottom: 20px; border: 1px solid var(--border); border-radius: 14px; color: var(--accent-dark); font-size: 21px; }
+.agent-mark img { display: block; width: 25px; height: 25px; object-fit: contain; }
 .agent-card p { flex: 1; color: var(--text-muted); font-size: 15px; }
 .agent-card a { display: inline-flex; min-height: 44px; align-items: center; gap: 7px; color: var(--text); font-size: 14px; font-weight: 700; text-decoration: underline; text-decoration-color: var(--accent); text-underline-offset: 4px; }
 .agent-card a:hover { color: var(--accent-dark); }
