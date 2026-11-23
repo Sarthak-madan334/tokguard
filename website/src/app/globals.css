@@ -234,7 +234,8 @@ code { overflow-wrap: anywhere; }
 .global-install code { display: inline-block; margin: 3px 0; color: var(--code-text); font-size: 14px; }
 .uninstall-info { display: grid; gap: 7px; border-top: 1px solid rgba(245,244,238,.14); padding: 16px 20px; }
 .uninstall-info > p { margin: 0; color: #D2CFC6; font-size: 14px; font-weight: 700; }
-.uninstall-info > code { width: max-content; color: var(--code-text); font-size: 14px; }
+.uninstall-info-command { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.uninstall-info-command > code { color: var(--code-text); font-size: 14px; }
 .uninstall-info > span { color: #D2CFC6; font-size: 14px; line-height: 1.55; }
 .uninstall-info > span code { color: var(--code-text); font-size: 14px; }
 .install-note { margin: 0; border-top: 1px solid rgba(245,244,238,.14); padding: 17px 20px 20px; color: #D2CFC6; font-size: 14px; }
