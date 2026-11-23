@@ -229,8 +229,14 @@ code { overflow-wrap: anywhere; }
 .copy-button { display: inline-flex; min-height: 44px; flex: 0 0 auto; align-items: center; gap: 8px; border: 1px solid rgba(245,244,238,.3); border-radius: var(--pill); padding: 8px 14px; background: transparent; color: var(--code-text); cursor: pointer; font-size: 14px; }
 .copy-button:hover { background: rgba(245,244,238,.1); }
 .global-install { border-top: 1px solid rgba(245,244,238,.14); padding: 18px 20px; }
-.global-install p { margin-bottom: 9px; color: #D2CFC6; font-size: 14px; }
+.global-install-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 9px; }
+.global-install p { margin: 0; color: #D2CFC6; font-size: 14px; }
 .global-install code { display: inline-block; margin: 3px 0; color: var(--code-text); font-size: 14px; }
+.uninstall-info { display: grid; gap: 7px; border-top: 1px solid rgba(245,244,238,.14); padding: 16px 20px; }
+.uninstall-info > p { margin: 0; color: #D2CFC6; font-size: 14px; font-weight: 700; }
+.uninstall-info > code { width: max-content; color: var(--code-text); font-size: 14px; }
+.uninstall-info > span { color: #D2CFC6; font-size: 14px; line-height: 1.55; }
+.uninstall-info > span code { color: var(--code-text); font-size: 14px; }
 .install-note { margin: 0; border-top: 1px solid rgba(245,244,238,.14); padding: 17px 20px 20px; color: #D2CFC6; font-size: 14px; }
 
 .limits-section { background: var(--surface-2); }
