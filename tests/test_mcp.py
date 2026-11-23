@@ -15,11 +15,11 @@ def test_mcp_map_and_find(tmp_path, monkeypatch):
     map_out = mcp_map()
     assert "hello.py" in map_out
     assert "say_hello()" in map_out
-    assert "[tg:" in map_out
+    assert "[tg:" not in map_out
 
     find_out = mcp_find("say_hello")
     assert "hello.py:1" in find_out
-    assert "[tg:" in find_out
+    assert "[tg:" not in find_out
 
 
 def test_mcp_read_range_and_symbol(tmp_path, monkeypatch):
@@ -30,7 +30,7 @@ def test_mcp_read_range_and_symbol(tmp_path, monkeypatch):
 
     sym_out = mcp_read_symbol("greet.py", "greet")
     assert "def greet(name):" in sym_out
-    assert "[tg:" in sym_out
+    assert "[tg:" not in sym_out
 
 
 def test_mcp_run(tmp_path, monkeypatch):
@@ -38,7 +38,7 @@ def test_mcp_run(tmp_path, monkeypatch):
     reset_session(tmp_path)
     run_out = mcp_run("python -c \"print('mcp run test')\"")
     assert "mcp run test" in run_out
-    assert "[tg:" in run_out
+    assert "[tg:" not in run_out
 
 
 def test_mcp_manager_tools_lock_submit_check_step_and_scope(tmp_path, monkeypatch):

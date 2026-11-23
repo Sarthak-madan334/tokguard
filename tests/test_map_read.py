@@ -57,6 +57,30 @@ def test_find_symbol(tmp_path):
     assert "calculate_tax(amount)" in result
 
 
+def test_find_symbol_compact_default_and_optional_context(tmp_path):
+    (tmp_path / "service.py").write_text(
+        "def target():\n    first = 1\n    second = 2\n    return first + second\n",
+        encoding="utf-8",
+    )
+    compact = find_symbol("target", root=tmp_path)
+    expanded = find_symbol("target", root=tmp_path, context=1)
+    assert "service.py:1: def target():" in compact
+    assert "first = 1" not in compact
+    assert "first = 1" in expanded
+
+
+def test_repo_map_focus_is_confined_and_relative(tmp_path):
+    src = tmp_path / "src"
+    src.mkdir()
+    (src / "main.py").write_text("def run():\n    pass\n", encoding="utf-8")
+    (tmp_path / "root.py").write_text("def root():\n    pass\n", encoding="utf-8")
+    focused = generate_repo_map(tmp_path, focus="src")
+    assert "main.py" in focused
+    assert "src/main.py" in focused
+    assert "root.py" not in focused
+    assert "inside" in generate_repo_map(tmp_path, focus="../outside")
+
+
 def test_read_range_and_unchanged_detection(tmp_path):
     file_path = tmp_path / "module.py"
     file_path.write_text("line1\nline2\nline3\nline4\nline5\n", encoding="utf-8")

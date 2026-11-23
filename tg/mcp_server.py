@@ -29,31 +29,31 @@ except (ImportError, ModuleNotFoundError):
 
 
 @app.tool()
-def map(override: bool = False) -> str:
-    """Repo tree with outline symbols (classes/functions)."""
-    action_key = "mcp:map"
+def map(override: bool = False, focus: str = "") -> str:
+    """Repo symbol outline; optionally focus on one repository directory."""
+    action_key = f"mcp:map:{focus}"
     allowed, guard_msg = check_guard(action_key, override=override)
     if not allowed:
         return guard_msg or "BUDGET EXCEEDED"
 
-    res = generate_repo_map()
+    res = generate_repo_map(focus=focus)
     record_action(action_key, res)
-    status = get_status_line()
-    return f"{guard_msg + '\n' if guard_msg else ''}{res}\n{status}"
+    status = get_status_line(only_changes=True)
+    return "\n".join(part for part in (guard_msg, res, status) if part)
 
 
 @app.tool()
-def find(query: str, max_results: int = 20, override: bool = False) -> str:
-    """Find symbol or regex with 1-line context (max 20 hits)."""
-    action_key = f"mcp:find:{query}"
+def find(query: str, max_results: int = 5, override: bool = False, context: int = 0) -> str:
+    """Find symbol or regex: 5 matching lines by default. Increase max_results or context to expand."""
+    action_key = f"mcp:find:{query}:{max_results}:{context}"
     allowed, guard_msg = check_guard(action_key, override=override)
     if not allowed:
         return guard_msg or "BUDGET EXCEEDED"
 
-    res = find_symbol(query, max_results=max_results)
+    res = find_symbol(query, max_results=max_results, context=context)
     record_action(action_key, res)
-    status = get_status_line()
-    return f"{guard_msg + '\n' if guard_msg else ''}{res}\n{status}"
+    status = get_status_line(only_changes=True)
+    return "\n".join(part for part in (guard_msg, res, status) if part)
 
 
 @app.tool()
@@ -66,8 +66,8 @@ def read_range(filepath: str, start: int, end: int, override: bool = False) -> s
 
     res = map_read_range(filepath, start, end)
     record_action(action_key, res, file_touched=filepath)
-    status = get_status_line()
-    return f"{guard_msg + '\n' if guard_msg else ''}{res}\n{status}"
+    status = get_status_line(only_changes=True)
+    return "\n".join(part for part in (guard_msg, res, status) if part)
 
 
 @app.tool()
@@ -80,8 +80,8 @@ def read_symbol(filepath: str, symbol_name: str, override: bool = False) -> str:
 
     res = map_read_symbol(filepath, symbol_name)
     record_action(action_key, res, file_touched=filepath)
-    status = get_status_line()
-    return f"{guard_msg + '\n' if guard_msg else ''}{res}\n{status}"
+    status = get_status_line(only_changes=True)
+    return "\n".join(part for part in (guard_msg, res, status) if part)
 
 
 @app.tool()
@@ -99,8 +99,8 @@ def run(command: str, max_lines: int = 120, max_chars: int = 6000, full: bool = 
         full=full,
     )
     record_action(action_key, output)
-    status = get_status_line()
-    return f"{guard_msg + '\n' if guard_msg else ''}{output}\n{status}"
+    status = get_status_line(only_changes=True)
+    return "\n".join(part for part in (guard_msg, output, status) if part)
 
 
 @app.tool()
