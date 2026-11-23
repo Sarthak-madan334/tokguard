@@ -215,7 +215,6 @@ export default function Home() {
                 <div className="uninstall-info-command"><code>npm uninstall -g tokguard</code><CopyCommand command="npm uninstall -g tokguard" /></div>
                 <span>Removes the global package. Project files and agent settings stay in place. For a project-local install, run <code>npm uninstall tokguard</code> in that project.</span>
               </div>
-              <p className="install-note">Setup updates agent MCP configuration and guidance files on your machine. Your repository stays on your machine. Setup is documented for PowerShell. For other shells, see the <a href="https://github.com/Sarthak-madan334/tokguard#installation" target="_blank" rel="noreferrer">README</a>.</p>
             </div>
           </div>
         </section>

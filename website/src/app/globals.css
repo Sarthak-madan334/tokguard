@@ -238,7 +238,6 @@ code { overflow-wrap: anywhere; }
 .uninstall-info-command > code { color: var(--code-text); font-size: 14px; }
 .uninstall-info > span { color: #D2CFC6; font-size: 14px; line-height: 1.55; }
 .uninstall-info > span code { color: var(--code-text); font-size: 14px; }
-.install-note { margin: 0; border-top: 1px solid rgba(245,244,238,.14); padding: 17px 20px 20px; color: #D2CFC6; font-size: 14px; }
 
 .limits-section { background: var(--surface-2); }
 .limits-card { display: grid; grid-template-columns: 1fr 1fr; align-items: center; gap: clamp(36px, 7vw, 88px); border: 1px solid var(--border); border-radius: var(--card-radius); padding: clamp(28px, 6vw, 64px); background: var(--surface); box-shadow: var(--shadow); }
