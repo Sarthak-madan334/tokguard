@@ -158,10 +158,15 @@ def extract_symbols(fpath: Path) -> List[str]:
     return extract_regex_symbols(content, fpath.name)
 
 
-def generate_repo_map(root: Path = Path(".")) -> str:
+def generate_repo_map(root: Path = Path("."), focus: str = "") -> str:
     """Generate compact repo tree with symbol outlines, capped at ~1500 tokens (6000 chars)."""
+    root = root.resolve()
+    scan_root = (root / focus).resolve() if focus else root
+    if not scan_root.is_relative_to(root) or not scan_root.is_dir():
+        return "Map focus must be an existing directory inside the repository."
     patterns = load_ignore_patterns(root)
-    cache_path = root / ".tokguard" / "map.json"
+    cache_name = "map.json" if scan_root == root else "map-" + hashlib.sha256(scan_root.relative_to(root).as_posix().encode()).hexdigest()[:16] + ".json"
+    cache_path = root / ".tokguard" / cache_name
     cache: dict = {"files": {}}
 
     if cache_path.exists():
@@ -175,7 +180,7 @@ def generate_repo_map(root: Path = Path(".")) -> str:
 
     # Walk repository
     all_files: List[Path] = []
-    for dirpath, dirnames, filenames in os.walk(root):
+    for dirpath, dirnames, filenames in os.walk(scan_root):
         rel_dir = os.path.relpath(dirpath, root)
         if rel_dir != "." and is_ignored(rel_dir, patterns):
             dirnames[:] = []  # Don't recurse
@@ -233,9 +238,10 @@ def generate_repo_map(root: Path = Path(".")) -> str:
     return "\n".join(compacted)
 
 
-def find_symbol(query: str, root: Path = Path("."), max_results: int = 20) -> str:
-    """Search for symbol or regex pattern across files with 1 line of context."""
+def find_symbol(query: str, root: Path = Path("."), max_results: int = 5, context: int = 0) -> str:
+    """Search with compact matches; request surrounding lines when needed."""
     max_results = max(1, max_results)
+    context = max(0, context)
     patterns = load_ignore_patterns(root)
     try:
         regex = re.compile(query, re.IGNORECASE)
@@ -276,12 +282,13 @@ def find_symbol(query: str, root: Path = Path("."), max_results: int = 20) -> st
                         line_num = idx + 1
                         # Format hit with 1 line context
                         ctx: List[str] = []
-                        if idx > 0:
-                            ctx.append(f"  {idx:4d} | {lines[idx-1]}")
-                        ctx.append(f"> {line_num:4d} | {line}")
-                        if idx + 1 < len(lines):
-                            ctx.append(f"  {idx+2:4d} | {lines[idx+1]}")
-                        matches.append(f"{rel_file}:{line_num}\n" + "\n".join(ctx))
+                        if context:
+                            for nearby in range(max(0, idx - context), min(len(lines), idx + context + 1)):
+                                marker = ">" if nearby == idx else " "
+                                ctx.append(f"{marker} {nearby + 1:4d} | {lines[nearby]}")
+                            matches.append(f"{rel_file}:{line_num}\n" + "\n".join(ctx))
+                        else:
+                            matches.append(f"{rel_file}:{line_num}: {line.strip()}")
                         if len(matches) >= max_results:
                             stopped_early = True
                             break
@@ -298,7 +305,7 @@ def find_symbol(query: str, root: Path = Path("."), max_results: int = 20) -> st
 
     res = "\n\n".join(matches)
     if stopped_early:
-        res += f"\n\n[Stopped after {max_results} matches; refine query to search further.]"
+        res += f"\n\n[Result limit {max_results} reached; increase max_results / --max or refine query.]"
     if skipped_large:
         res += f"\n\n[Skipped {skipped_large} files larger than {MAX_SCAN_FILE_BYTES // 1_000_000} MB.]"
     return res

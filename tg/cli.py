@@ -127,13 +127,14 @@ def cmd_run(args: argparse.Namespace) -> int:
     )
 
     record_action(action_key, output)
-    status = get_status_line()
+    status = get_status_line(only_changes=True)
 
     out_parts = []
     if guard_msg:
         out_parts.append(guard_msg)
     out_parts.append(output)
-    out_parts.append(status)
+    if status:
+        out_parts.append(status)
 
     print("\n".join(out_parts))
     return code
@@ -141,39 +142,41 @@ def cmd_run(args: argparse.Namespace) -> int:
 
 def cmd_map(args: argparse.Namespace) -> int:
     """Execute tg map."""
-    action_key = "map"
+    action_key = f"map:{getattr(args, 'focus', '')}"
     allowed, guard_msg = check_guard(action_key, override=args.override)
     if not allowed:
         print(guard_msg)
         return 1
 
-    res = generate_repo_map()
+    res = generate_repo_map(focus=getattr(args, "focus", ""))
     record_action(action_key, res)
-    status = get_status_line()
+    status = get_status_line(only_changes=True)
 
     if guard_msg:
         print(guard_msg)
     print(res)
-    print(status)
+    if status:
+        print(status)
     return 0
 
 
 def cmd_find(args: argparse.Namespace) -> int:
     """Execute tg find."""
-    action_key = f"find:{args.query}"
+    action_key = f"find:{args.query}:{args.max}:{getattr(args, 'context', 0)}"
     allowed, guard_msg = check_guard(action_key, override=args.override)
     if not allowed:
         print(guard_msg)
         return 1
 
-    res = find_symbol(args.query, max_results=args.max)
+    res = find_symbol(args.query, max_results=args.max, context=getattr(args, "context", 0))
     record_action(action_key, res)
-    status = get_status_line()
+    status = get_status_line(only_changes=True)
 
     if guard_msg:
         print(guard_msg)
     print(res)
-    print(status)
+    if status:
+        print(status)
     return 0
 
 
@@ -212,12 +215,13 @@ def cmd_read(args: argparse.Namespace) -> int:
         res = read_range(filepath, 1, 100)
 
     record_action(action_key, res, file_touched=filepath)
-    status = get_status_line()
+    status = get_status_line(only_changes=True)
 
     if guard_msg:
         print(guard_msg)
     print(res)
-    print(status)
+    if status:
+        print(status)
     return 0
 
 
@@ -301,12 +305,14 @@ def main(argv: list[str] | None = None) -> int:
 
     # map
     map_parser = subparsers.add_parser("map", help="Display repo symbol outline map")
+    map_parser.add_argument("--focus", default="", help="Map only this repository directory")
     map_parser.add_argument("--override", action="store_true", help="Override task drift lockout")
 
     # find
     find_parser = subparsers.add_parser("find", help="Find symbol or pattern")
     find_parser.add_argument("query", help="Symbol or regex to search")
-    find_parser.add_argument("--max", type=int, default=20, help="Max results")
+    find_parser.add_argument("--max", type=int, default=5, help="Max results (default: 5; increase for more)")
+    find_parser.add_argument("--context", type=int, default=0, help="Surrounding lines per match (default: 0)")
     find_parser.add_argument("--override", action="store_true", help="Override task drift lockout")
 
     # read

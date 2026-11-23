@@ -53,7 +53,7 @@ def setup_task_env(tmp_dir: Path) -> Path:
     dest = tmp_dir / "fixture"
     if dest.exists():
         shutil.rmtree(dest)
-    shutil.copytree(fixture_src, dest)
+    shutil.copytree(fixture_src, dest, ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
     return dest
 
 

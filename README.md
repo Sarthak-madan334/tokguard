@@ -109,7 +109,8 @@ The hook uses the installed `tg` command. Install globally with `npm install -g 
 
 ### 1. Input Token Reduction (What enters the context)
 - **`tg map`**: Generates a compact AST/regex repo outline (~300 tokens vs 2,500+ for broad directory crawls).
-- **`tg find <symbol|regex>`**: Fast grep returning up to 20 hits with exactly 1 line of context.
+- **`tg find <symbol|regex>`**: Returns up to 5 matching lines by default. Increase `--max` for more results and use `--context` for surrounding lines.
+- **Focused maps**: `tg map --focus src` maps only that repository directory while keeping paths relative to the repository root.
 - **`tg read <file> <start>-<end>`**: Reads only requested line ranges with line numbers.
 - **Unchanged File Detection**: Automatically hashes read files in `.tokguard/session.json`. Repeated reads output `[unchanged since last read: lines X-Y]` instead of re-injecting hundreds of lines.
 - **`tg slim <file>`**: Safely removes comments, docstrings, and blank lines for read-only references.
@@ -123,6 +124,7 @@ The hook uses the installed `tg` command. Install globally with `npm install -g 
 - **Terse Rules**: `AGENTS.md` instructs models to emit concise diffs rather than entire updated files.
 
 ### 3. Session Usage & Loop Detection
+- **Quiet tool results**: Map, find, read, and run report task status only when drift or step state changes. Checkpoint notices still appear. Use `tg budget` for current usage on demand. MCP callers can use `map(focus="src")` and `find(query="symbol", max_results=20, context=1)` to expand retrieval explicitly.
 - **Usage Tracking**: Tracks estimated token use and action history in `.tokguard/session.json`; status shows usage without a token threshold.
 - **No Token Stops**: Token usage never warns, resets the ledger, or terminates a command.
 - **Loop Detection**: Reports repeated actions so the agent can choose a different approach.

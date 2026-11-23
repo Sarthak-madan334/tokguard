@@ -173,7 +173,7 @@ def check_guard(
     return True, None
 
 
-def get_status_line(root: Path = Path(".")) -> str:
+def get_status_line(root: Path = Path("."), only_changes: bool = False) -> str:
     """Return compact session, drift, and step status."""
     session = load_session(root)
     used = session.get("cumulative_tokens", 0)
@@ -190,11 +190,17 @@ def get_status_line(root: Path = Path(".")) -> str:
         except Exception:
             pass
     status = f"[tg: {format_token_k(used)} tokens | {detail}]"
+    if only_changes:
+        previous = session.get("last_reported_status")
+        session["last_reported_status"] = detail
+        save_session(session, root)
+        if previous == detail or (previous is None and detail == "drift -- | step 0/0"):
+            status = ""
     try:
         from tg.manager import consume_checkpoint_notice
         notice = consume_checkpoint_notice(root)
         if notice:
-            return notice + "\n" + status
+            return "\n".join(part for part in (notice, status) if part)
     except (OSError, ValueError, json.JSONDecodeError):
         pass
     return status
