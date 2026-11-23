@@ -40,10 +40,10 @@ npx -y tokguard@latest setup
 
 ### Uninstall TokGuard
 
-Remove a global npm installation with:
+Remove a global npm installation with npm:
 
 ```powershell
-tg uninstall
+npm uninstall -g tokguard
 ```
 
 This removes the global TokGuard package. It leaves project files created by `tg init`, `.tokguard` data, and assistant settings from `tg setup` untouched. For a project-local npm installation, run `npm uninstall tokguard` from that project.
