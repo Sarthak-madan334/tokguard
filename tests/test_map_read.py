@@ -121,3 +121,25 @@ def other():
     assert "return total" in out
     assert "def other():" not in out
 
+
+def test_repository_tools_reject_symlinks_outside_root(tmp_path):
+    outside = tmp_path.parent / f"{tmp_path.name}-outside.py"
+    outside.write_text("def external_secret_marker():\n    pass\n", encoding="utf-8")
+    (tmp_path / "linked.py").symlink_to(outside)
+
+    assert "outside repository root" in read_range("linked.py", 1, 2, root=tmp_path)
+    assert "outside repository root" in read_symbol("linked.py", "external_secret_marker", root=tmp_path)
+    assert "No matches found" in find_symbol("external_secret_marker", root=tmp_path)
+    assert "linked.py" not in generate_repo_map(tmp_path)
+
+
+def test_repository_tools_allow_symlinks_inside_root(tmp_path):
+    target = tmp_path / "target.txt"
+    target.write_text("def internal_marker():\n    pass\n", encoding="utf-8")
+    (tmp_path / "linked.py").symlink_to(target)
+    (tmp_path / "range_link.py").symlink_to(target)
+
+    assert "internal_marker" in read_range("range_link.py", 1, 2, root=tmp_path)
+    assert "internal_marker" in read_symbol("linked.py", "internal_marker", root=tmp_path)
+    assert "linked.py:1" in find_symbol("internal_marker", root=tmp_path)
+    assert "linked.py: internal_marker()" in generate_repo_map(tmp_path)
