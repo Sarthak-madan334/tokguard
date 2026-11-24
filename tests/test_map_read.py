@@ -2,6 +2,7 @@
 
 import json
 from pathlib import Path
+from tg.budget import estimate_tokens, save_config
 from tg.map import (
     generate_repo_map,
     find_symbol,
@@ -128,6 +129,31 @@ def other():
     assert "def other():" not in out
     assert "unchanged" not in out
     assert "unchanged since last read" in read_symbol("data.py", "process_data", root=tmp_path)
+
+
+def test_file_reads_and_find_context_respect_token_limit(tmp_path):
+    (tmp_path / ".tokguard").mkdir()
+    save_config({"max_file_read_tokens": 120}, root=tmp_path)
+    source = "\n".join(f"def item_{i}(): return '{'x' * 40}'" for i in range(30))
+    symbol_source = "def large_symbol():\n" + "\n".join(
+        f"    value_{i} = '{'x' * 40}'" for i in range(30)
+    )
+    (tmp_path / "module.py").write_text(source, encoding="utf-8")
+    (tmp_path / "symbol.py").write_text(symbol_source, encoding="utf-8")
+
+    range_output = read_range("module.py", 1, 30, root=tmp_path)
+    symbol_output = read_symbol("symbol.py", "large_symbol", root=tmp_path)
+    find_output = find_symbol("item_", root=tmp_path, max_results=30, context=1)
+
+    assert estimate_tokens(range_output) <= 120
+    assert "next chunk: tg read module.py --range" in range_output
+    assert estimate_tokens(symbol_output) <= 120
+    assert "next chunk: tg read symbol.py --range" in symbol_output
+    assert estimate_tokens(find_output) <= 120
+    assert "next chunk: tg find --offset" in find_output
+    next_find_chunk = find_symbol("item_", root=tmp_path, max_results=2, offset=1)
+    assert "module.py:2" in next_find_chunk
+    assert "module.py:1" not in next_find_chunk
 
 
 def test_repository_tools_reject_symlinks_outside_root(tmp_path):

@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import math
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 DEFAULT_CONFIG = {
     "drift_thresholds": {"minor": 21, "major": 46, "off": 71},
@@ -30,6 +30,48 @@ def estimate_tokens(text: str) -> int:
         return len(enc.encode(text))
     except Exception:
         return max(1, math.ceil(len(text) / 4))
+
+
+def truncate_output(
+    text: str,
+    max_tokens: int,
+    marker: str | Callable[[str], str],
+    line_boundary: bool = False,
+) -> str:
+    """Keep output within a token limit and append a continuation marker."""
+    try:
+        max_tokens = max(0, int(max_tokens))
+    except (TypeError, ValueError):
+        max_tokens = 0
+    if estimate_tokens(text) <= max_tokens:
+        return text
+    if max_tokens == 0:
+        return ""
+
+    def candidate(prefix: str) -> str:
+        if line_boundary:
+            prefix = prefix[:prefix.rfind("\n")] if "\n" in prefix else ""
+        prefix = prefix.rstrip()
+        suffix = marker(prefix) if callable(marker) else marker
+        if estimate_tokens(suffix) > max_tokens:
+            suffix = "[truncated]"
+        if estimate_tokens(suffix) > max_tokens:
+            suffix = "…"
+        if estimate_tokens(suffix) > max_tokens:
+            return ""
+        return f"{prefix}\n{suffix}" if prefix else suffix
+
+    low, high = 0, len(text)
+    best = candidate("")
+    while low <= high:
+        middle = (low + high) // 2
+        current = candidate(text[:middle])
+        if current and estimate_tokens(current) <= max_tokens:
+            best = current
+            low = middle + 1
+        else:
+            high = middle - 1
+    return best
 
 
 def format_token_k(count: int) -> str:
@@ -249,4 +291,3 @@ def generate_handoff(task_summary: str = "In-progress task", root: Path = Path("
         pass
     handoff_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return handoff_path
-

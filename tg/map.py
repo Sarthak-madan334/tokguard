@@ -8,8 +8,11 @@ import hashlib
 import json
 import os
 import re
+import shlex
 from pathlib import Path
 from typing import Dict, List, Optional, Set, Tuple
+
+from tg.budget import estimate_tokens, load_config, truncate_output
 
 DEFAULT_IGNORES = {
     ".git",
@@ -257,11 +260,18 @@ def generate_repo_map(root: Path = Path("."), focus: str = "") -> str:
     return "\n".join(compacted)
 
 
-def find_symbol(query: str, root: Path = Path("."), max_results: int = 5, context: int = 0) -> str:
+def find_symbol(
+    query: str,
+    root: Path = Path("."),
+    max_results: int = 5,
+    context: int = 0,
+    offset: int = 0,
+) -> str:
     """Search with compact matches; request surrounding lines when needed."""
     root = Path(root).resolve()
     max_results = max(1, max_results)
     context = max(0, context)
+    offset = max(0, offset)
     patterns = load_ignore_patterns(root)
     try:
         regex = re.compile(query, re.IGNORECASE)
@@ -269,6 +279,7 @@ def find_symbol(query: str, root: Path = Path("."), max_results: int = 5, contex
         regex = re.compile(re.escape(query), re.IGNORECASE)
 
     matches: List[str] = []
+    seen_matches = 0
     skipped_large = 0
     stopped_early = False
 
@@ -306,6 +317,9 @@ def find_symbol(query: str, root: Path = Path("."), max_results: int = 5, contex
             lines = content.splitlines()
             for idx, line in enumerate(lines):
                 if regex.search(line):
+                    if seen_matches < offset:
+                        seen_matches += 1
+                        continue
                     if len(matches) < max_results:
                         line_num = idx + 1
                         # Format hit with 1 line context
@@ -317,6 +331,7 @@ def find_symbol(query: str, root: Path = Path("."), max_results: int = 5, contex
                             matches.append(f"{rel_file}:{line_num}\n" + "\n".join(ctx))
                         else:
                             matches.append(f"{rel_file}:{line_num}: {line.strip()}")
+                        seen_matches += 1
                         if len(matches) >= max_results:
                             stopped_early = True
                             break
@@ -329,14 +344,35 @@ def find_symbol(query: str, root: Path = Path("."), max_results: int = 5, contex
         result = f"No matches found for '{query}'."
         if skipped_large:
             result += f"\n[Skipped {skipped_large} files larger than {MAX_SCAN_FILE_BYTES // 1_000_000} MB.]"
-        return result
+        return truncate_output(
+            result,
+            load_config(root).get("max_file_read_tokens", 2500),
+            "[truncated; refine the query or request a smaller context to continue]",
+        )
 
     res = "\n\n".join(matches)
     if stopped_early:
         res += f"\n\n[Result limit {max_results} reached; increase max_results / --max or refine query.]"
     if skipped_large:
         res += f"\n\n[Skipped {skipped_large} files larger than {MAX_SCAN_FILE_BYTES // 1_000_000} MB.]"
-    return res
+    limit = load_config(root).get("max_file_read_tokens", 2500)
+    if estimate_tokens(res) <= limit:
+        return res
+
+    for included in range(len(matches), -1, -1):
+        next_offset = offset + included
+        marker = (
+            f"[truncated; next chunk: tg find --offset {next_offset} "
+            f"--max {max_results} --context {context} -- {shlex.quote(query)}]"
+        )
+        candidate = "\n\n".join([*matches[:included], marker])
+        if estimate_tokens(candidate) <= limit:
+            return candidate
+    return truncate_output(
+        res,
+        limit,
+        "[truncated; reduce context or max_results to continue]",
+    )
 
 
 def file_hash(content: str) -> str:
@@ -402,14 +438,33 @@ def read_range(filepath: str, start: int, end: int, root: Path = Path(".")) -> s
         request_key=f"{start}-{end}",
         total_lines=len(lines),
     )
+    limit = load_config(root).get("max_file_read_tokens", 2500)
 
     if unchanged:
-        return f"[unchanged since last read: lines {start}-{end} of {total_lines} in {rel_path}]"
+        return truncate_output(
+            f"[unchanged since last read: lines {start}-{end} of {total_lines} in {rel_path}]",
+            limit,
+            f"[truncated; next chunk: tg read {filepath} --range {start}-{end}]",
+        )
 
     output_lines: List[str] = [f"--- {rel_path} ({start}-{end}/{total_lines}) ---"]
     for i in range(start_idx, end_idx):
         output_lines.append(f"{i + 1:4d} | {lines[i]}")
-    return "\n".join(output_lines)
+    result = "\n".join(output_lines)
+
+    def continuation(prefix: str) -> str:
+        next_line = start
+        for line in reversed(prefix.splitlines()):
+            match = re.match(r"\s*(\d+)\s+\|", line)
+            if match:
+                next_line = int(match.group(1)) + 1
+                break
+        return (
+            f"[truncated; next chunk: tg read {shlex.quote(filepath)} "
+            f"--range {next_line}-{end}]"
+        )
+
+    return truncate_output(result, limit, continuation, line_boundary=True)
 
 
 def read_symbol(filepath: str, symbol_name: str, root: Path = Path(".")) -> str:
