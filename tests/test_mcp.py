@@ -3,7 +3,7 @@
 from pathlib import Path
 from tg.mcp_server import map as mcp_map, find as mcp_find, read_range as mcp_read_range, read_symbol as mcp_read_symbol, run as mcp_run
 from tg.mcp_server import plan_lock as mcp_plan_lock, plan_submit as mcp_plan_submit, check as mcp_check, step as mcp_step, scope_add as mcp_scope_add
-from tg.budget import reset_session
+from tg.budget import estimate_tokens, reset_session, save_config
 import json
 
 
@@ -31,6 +31,18 @@ def test_mcp_read_range_and_symbol(tmp_path, monkeypatch):
     sym_out = mcp_read_symbol("greet.py", "greet")
     assert "def greet(name):" in sym_out
     assert "[tg:" not in sym_out
+
+
+def test_mcp_response_respects_configured_output_limit(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    reset_session(tmp_path)
+    save_config({"max_tool_output_tokens": 30}, root=tmp_path)
+    (tmp_path / "large.txt").write_text("\n".join(f"line {i} {'x' * 80}" for i in range(30)), encoding="utf-8")
+
+    output = mcp_read_range("large.txt", 1, 30)
+
+    assert estimate_tokens(output) <= 30
+    assert "[truncated" in output
 
 
 def test_mcp_run(tmp_path, monkeypatch):
@@ -64,4 +76,3 @@ def test_mcp_manager_tools_lock_submit_check_step_and_scope(tmp_path, monkeypatc
     assert "Step one" in mcp_step("show")
     assert "Step one done" in mcp_step("done", step_id="one")
     assert "Scope added" in mcp_scope_add("tg/generated/", "The task explicitly requires this generated output.")
-
