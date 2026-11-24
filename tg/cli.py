@@ -162,13 +162,20 @@ def cmd_map(args: argparse.Namespace) -> int:
 
 def cmd_find(args: argparse.Namespace) -> int:
     """Execute tg find."""
-    action_key = f"find:{args.query}:{args.max}:{getattr(args, 'context', 0)}"
+    context = getattr(args, "context", 0)
+    offset = getattr(args, "offset", 0)
+    action_key = f"find:{args.query}:{args.max}:{context}:{offset}"
     allowed, guard_msg = check_guard(action_key, override=args.override)
     if not allowed:
         print(guard_msg)
         return 1
 
-    res = find_symbol(args.query, max_results=args.max, context=getattr(args, "context", 0))
+    res = find_symbol(
+        args.query,
+        max_results=args.max,
+        context=context,
+        offset=offset,
+    )
     record_action(action_key, res)
     status = get_status_line(only_changes=True)
 
@@ -313,6 +320,7 @@ def main(argv: list[str] | None = None) -> int:
     find_parser.add_argument("query", help="Symbol or regex to search")
     find_parser.add_argument("--max", type=int, default=5, help="Max results (default: 5; increase for more)")
     find_parser.add_argument("--context", type=int, default=0, help="Surrounding lines per match (default: 0)")
+    find_parser.add_argument("--offset", type=int, default=0, help="Skip this many matches")
     find_parser.add_argument("--override", action="store_true", help="Override task drift lockout")
 
     # read
@@ -463,4 +471,3 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
-
