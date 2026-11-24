@@ -96,6 +96,11 @@ def test_read_range_and_unchanged_detection(tmp_path):
     second = read_range("module.py", 2, 4, root=tmp_path)
     assert "[unchanged since last read: lines 2-4 of 5 in module.py]" in second
 
+    different_range = read_range("module.py", 1, 1, root=tmp_path)
+    assert "line1" in different_range
+    assert "unchanged" not in different_range
+    assert "unchanged since last read" in read_range("module.py", 1, 1, root=tmp_path)
+
     # Modify file
     file_path.write_text("line1\nmodified line2\nline3\nline4\nline5\n", encoding="utf-8")
     third = read_range("module.py", 2, 4, root=tmp_path)
@@ -116,10 +121,13 @@ def other():
     pass
 """
     (tmp_path / "data.py").write_text(code, encoding="utf-8")
+    read_range("data.py", 1, 1, root=tmp_path)
     out = read_symbol("data.py", "process_data", root=tmp_path)
     assert "def process_data(items):" in out
     assert "return total" in out
     assert "def other():" not in out
+    assert "unchanged" not in out
+    assert "unchanged since last read" in read_symbol("data.py", "process_data", root=tmp_path)
 
 
 def test_repository_tools_reject_symlinks_outside_root(tmp_path):

@@ -344,27 +344,35 @@ def file_hash(content: str) -> str:
     return hashlib.sha256(content.encode("utf-8")).hexdigest()
 
 
-def track_session_read(filepath: str, content: str, root: Path = Path(".")) -> Tuple[bool, int]:
+def track_session_read(
+    filepath: str,
+    content: str,
+    root: Path = Path("."),
+    request_key: str = "file",
+    total_lines: Optional[int] = None,
+) -> Tuple[bool, int]:
     """
     Track file reads in .tokguard/session.json.
     Returns (is_unchanged, total_lines).
     """
     session_path = root / ".tokguard" / "session.json"
-    session: dict = {"file_hashes": {}, "cumulative_tokens": 0, "history": []}
+    session: dict = {"read_ranges": {}, "cumulative_tokens": 0, "history": []}
     if session_path.exists():
         try:
             session = json.loads(session_path.read_text(encoding="utf-8"))
         except Exception:
             pass
 
-    file_hashes = session.setdefault("file_hashes", {})
+    read_ranges = session.setdefault("read_ranges", {})
+    file_ranges = read_ranges.setdefault(filepath, {})
     curr_hash = file_hash(content)
-    total_lines = len(content.splitlines())
+    if total_lines is None:
+        total_lines = len(content.splitlines())
 
-    if file_hashes.get(filepath) == curr_hash:
+    if file_ranges.get(request_key) == curr_hash:
         return True, total_lines
 
-    file_hashes[filepath] = curr_hash
+    file_ranges[request_key] = curr_hash
     session_path.parent.mkdir(parents=True, exist_ok=True)
     session_path.write_text(json.dumps(session, indent=2), encoding="utf-8")
     return False, total_lines
@@ -383,11 +391,17 @@ def read_range(filepath: str, start: int, end: int, root: Path = Path(".")) -> s
 
     content = resolved_fpath.read_text(encoding="utf-8", errors="replace")
     rel_path = fpath.relative_to(root).as_posix()
-    unchanged, total_lines = track_session_read(rel_path, content, root=root)
-
     lines = content.splitlines()
     start_idx = max(0, start - 1)
     end_idx = min(len(lines), end)
+    requested_content = "\n".join(lines[start_idx:end_idx])
+    unchanged, total_lines = track_session_read(
+        rel_path,
+        requested_content,
+        root=root,
+        request_key=f"{start}-{end}",
+        total_lines=len(lines),
+    )
 
     if unchanged:
         return f"[unchanged since last read: lines {start}-{end} of {total_lines} in {rel_path}]"
