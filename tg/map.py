@@ -97,6 +97,16 @@ def _read_scan_text(fpath: Path) -> Optional[str]:
     return content.decode("utf-8", errors="ignore")
 
 
+def _resolve_repo_path(fpath: Path, root: Path) -> Optional[Path]:
+    """Resolve a path and return it only when its target remains inside the repo."""
+    try:
+        resolved = fpath.resolve()
+        resolved.relative_to(root)
+        return resolved
+    except (OSError, RuntimeError, ValueError):
+        return None
+
+
 def extract_python_symbols(source: str) -> List[str]:
     """Extract classes and functions from Python source using AST."""
     try:
@@ -144,12 +154,12 @@ def extract_regex_symbols(source: str, filename: str) -> List[str]:
     return []
 
 
-def extract_symbols(fpath: Path) -> List[str]:
+def extract_symbols(fpath: Path, source_path: Optional[Path] = None) -> List[str]:
     """Extract top symbols from a given file."""
     suffix = fpath.suffix.lower()
     if suffix not in SYMBOL_SOURCE_SUFFIXES:
         return []
-    content = _read_scan_text(fpath)
+    content = _read_scan_text(source_path or fpath)
     if content is None:
         return []
 
@@ -187,18 +197,27 @@ def generate_repo_map(root: Path = Path("."), focus: str = "") -> str:
             continue
 
         # Filter out ignored directories
-        dirnames[:] = [d for d in dirnames if not is_ignored(os.path.join(rel_dir if rel_dir != "." else "", d), patterns)]
+        dirnames[:] = [
+            d
+            for d in dirnames
+            if not is_ignored(os.path.join(rel_dir if rel_dir != "." else "", d), patterns)
+            and _resolve_repo_path(Path(dirpath) / d, root) is not None
+        ]
 
         for fname in sorted(filenames):
             rel_file = os.path.normpath(os.path.join(rel_dir, fname)) if rel_dir != "." else fname
             rel_file = rel_file.replace("\\", "/")
-            if not is_ignored(rel_file, patterns):
-                all_files.append(Path(dirpath) / fname)
+            fpath = Path(dirpath) / fname
+            if not is_ignored(rel_file, patterns) and _resolve_repo_path(fpath, root) is not None:
+                all_files.append(fpath)
 
     for fpath in sorted(all_files):
         rel_str = fpath.relative_to(root).as_posix()
+        resolved_fpath = _resolve_repo_path(fpath, root)
+        if resolved_fpath is None:
+            continue
         try:
-            stat = fpath.stat()
+            stat = resolved_fpath.stat()
             mtime = stat.st_mtime
         except Exception:
             continue
@@ -207,7 +226,7 @@ def generate_repo_map(root: Path = Path("."), focus: str = "") -> str:
         if cached_entry and cached_entry.get("mtime") == mtime:
             symbols = cached_entry.get("symbols", [])
         else:
-            symbols = extract_symbols(fpath)
+            symbols = extract_symbols(fpath, source_path=resolved_fpath)
 
         updated_cache["files"][rel_str] = {"mtime": mtime, "symbols": symbols}
 
@@ -240,6 +259,7 @@ def generate_repo_map(root: Path = Path("."), focus: str = "") -> str:
 
 def find_symbol(query: str, root: Path = Path("."), max_results: int = 5, context: int = 0) -> str:
     """Search with compact matches; request surrounding lines when needed."""
+    root = Path(root).resolve()
     max_results = max(1, max_results)
     context = max(0, context)
     patterns = load_ignore_patterns(root)
@@ -257,7 +277,12 @@ def find_symbol(query: str, root: Path = Path("."), max_results: int = 5, contex
         if rel_dir != "." and is_ignored(rel_dir, patterns):
             dirnames[:] = []
             continue
-        dirnames[:] = [d for d in dirnames if not is_ignored(os.path.join(rel_dir if rel_dir != "." else "", d), patterns)]
+        dirnames[:] = [
+            d
+            for d in dirnames
+            if not is_ignored(os.path.join(rel_dir if rel_dir != "." else "", d), patterns)
+            and _resolve_repo_path(Path(dirpath) / d, root) is not None
+        ]
 
         for fname in sorted(filenames):
             rel_file = (os.path.normpath(os.path.join(rel_dir, fname)) if rel_dir != "." else fname).replace("\\", "/")
@@ -265,13 +290,16 @@ def find_symbol(query: str, root: Path = Path("."), max_results: int = 5, contex
                 continue
 
             fpath = Path(dirpath) / fname
+            resolved_fpath = _resolve_repo_path(fpath, root)
+            if resolved_fpath is None:
+                continue
             try:
-                if fpath.stat().st_size > MAX_SCAN_FILE_BYTES:
+                if resolved_fpath.stat().st_size > MAX_SCAN_FILE_BYTES:
                     skipped_large += 1
                     continue
             except OSError:
                 continue
-            content = _read_scan_text(fpath)
+            content = _read_scan_text(resolved_fpath)
             if content is None:
                 continue
 
@@ -344,11 +372,16 @@ def track_session_read(filepath: str, content: str, root: Path = Path(".")) -> T
 
 def read_range(filepath: str, start: int, end: int, root: Path = Path(".")) -> str:
     """Read a specific 1-indexed line range from a file with line numbers."""
+    root = Path(root).resolve()
     fpath = root / filepath
     if not fpath.exists():
         return f"Error: File not found '{filepath}'"
 
-    content = fpath.read_text(encoding="utf-8", errors="replace")
+    resolved_fpath = _resolve_repo_path(fpath, root)
+    if resolved_fpath is None:
+        return f"Error: File path outside repository root '{filepath}'"
+
+    content = resolved_fpath.read_text(encoding="utf-8", errors="replace")
     rel_path = fpath.relative_to(root).as_posix()
     unchanged, total_lines = track_session_read(rel_path, content, root=root)
 
@@ -367,11 +400,16 @@ def read_range(filepath: str, start: int, end: int, root: Path = Path(".")) -> s
 
 def read_symbol(filepath: str, symbol_name: str, root: Path = Path(".")) -> str:
     """Read full body of a symbol (class or function) from a file."""
+    root = Path(root).resolve()
     fpath = root / filepath
     if not fpath.exists():
         return f"Error: File not found '{filepath}'"
 
-    content = fpath.read_text(encoding="utf-8", errors="replace")
+    resolved_fpath = _resolve_repo_path(fpath, root)
+    if resolved_fpath is None:
+        return f"Error: File path outside repository root '{filepath}'"
+
+    content = resolved_fpath.read_text(encoding="utf-8", errors="replace")
     start_line: Optional[int] = None
     end_line: Optional[int] = None
 
