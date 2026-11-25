@@ -17,7 +17,15 @@ from tg.budget import (
     record_action,
     truncate_output,
 )
-from tg.map import find_symbol, generate_repo_map, read_range as map_read_range, read_symbol as map_read_symbol
+from tg.map import (
+    DEFAULT_SCAN_BYTES,
+    DEFAULT_SCAN_FILES,
+    DEFAULT_SCAN_SECONDS,
+    find_symbol,
+    generate_repo_map,
+    read_range as map_read_range,
+    read_symbol as map_read_symbol,
+)
 from tg.run import execute_and_compress
 from tg import manager
 
@@ -46,14 +54,25 @@ def _cap_mcp_response(func):
 
 @app.tool()
 @_cap_mcp_response
-def map(override: bool = False, focus: str = "") -> str:
+def map(
+    override: bool = False,
+    focus: str = "",
+    max_scan_files: int = DEFAULT_SCAN_FILES,
+    max_scan_bytes: int = DEFAULT_SCAN_BYTES,
+    max_scan_seconds: float = DEFAULT_SCAN_SECONDS,
+) -> str:
     """Repo symbol outline; optionally focus on one repository directory."""
-    action_key = f"mcp:map:{focus}"
+    action_key = f"mcp:map:{focus}:{max_scan_files}:{max_scan_bytes}:{max_scan_seconds}"
     allowed, guard_msg = check_guard(action_key, override=override)
     if not allowed:
         return guard_msg or "BUDGET EXCEEDED"
 
-    res = generate_repo_map(focus=focus)
+    res = generate_repo_map(
+        focus=focus,
+        max_scan_files=max_scan_files,
+        max_scan_bytes=max_scan_bytes,
+        max_scan_seconds=max_scan_seconds,
+    )
     record_action(action_key, res)
     status = get_status_line(only_changes=True)
     return "\n".join(part for part in (guard_msg, res, status) if part)
@@ -67,14 +86,28 @@ def find(
     override: bool = False,
     context: int = 0,
     offset: int = 0,
+    max_scan_files: int = DEFAULT_SCAN_FILES,
+    max_scan_bytes: int = DEFAULT_SCAN_BYTES,
+    max_scan_seconds: float = DEFAULT_SCAN_SECONDS,
 ) -> str:
     """Find matching lines; use offset to continue from a truncated result."""
-    action_key = f"mcp:find:{query}:{max_results}:{context}:{offset}"
+    action_key = (
+        f"mcp:find:{query}:{max_results}:{context}:{offset}:"
+        f"{max_scan_files}:{max_scan_bytes}:{max_scan_seconds}"
+    )
     allowed, guard_msg = check_guard(action_key, override=override)
     if not allowed:
         return guard_msg or "BUDGET EXCEEDED"
 
-    res = find_symbol(query, max_results=max_results, context=context, offset=offset)
+    res = find_symbol(
+        query,
+        max_results=max_results,
+        context=context,
+        offset=offset,
+        max_scan_files=max_scan_files,
+        max_scan_bytes=max_scan_bytes,
+        max_scan_seconds=max_scan_seconds,
+    )
     record_action(action_key, res)
     status = get_status_line(only_changes=True)
     return "\n".join(part for part in (guard_msg, res, status) if part)

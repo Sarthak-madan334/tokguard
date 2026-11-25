@@ -16,7 +16,15 @@ from tg.budget import (
     reset_session,
     generate_handoff,
 )
-from tg.map import find_symbol, generate_repo_map, read_range, read_symbol
+from tg.map import (
+    DEFAULT_SCAN_BYTES,
+    DEFAULT_SCAN_FILES,
+    DEFAULT_SCAN_SECONDS,
+    find_symbol,
+    generate_repo_map,
+    read_range,
+    read_symbol,
+)
 from tg.run import execute_and_compress
 from tg.slim import slim_file
 from tg.setup import setup_all
@@ -142,13 +150,23 @@ def cmd_run(args: argparse.Namespace) -> int:
 
 def cmd_map(args: argparse.Namespace) -> int:
     """Execute tg map."""
-    action_key = f"map:{getattr(args, 'focus', '')}"
+    scan_limits = (
+        getattr(args, "scan_files", DEFAULT_SCAN_FILES),
+        getattr(args, "scan_bytes", DEFAULT_SCAN_BYTES),
+        getattr(args, "scan_seconds", DEFAULT_SCAN_SECONDS),
+    )
+    action_key = f"map:{getattr(args, 'focus', '')}:{scan_limits}"
     allowed, guard_msg = check_guard(action_key, override=args.override)
     if not allowed:
         print(guard_msg)
         return 1
 
-    res = generate_repo_map(focus=getattr(args, "focus", ""))
+    res = generate_repo_map(
+        focus=getattr(args, "focus", ""),
+        max_scan_files=scan_limits[0],
+        max_scan_bytes=scan_limits[1],
+        max_scan_seconds=scan_limits[2],
+    )
     record_action(action_key, res)
     status = get_status_line(only_changes=True)
 
@@ -164,7 +182,12 @@ def cmd_find(args: argparse.Namespace) -> int:
     """Execute tg find."""
     context = getattr(args, "context", 0)
     offset = getattr(args, "offset", 0)
-    action_key = f"find:{args.query}:{args.max}:{context}:{offset}"
+    scan_limits = (
+        getattr(args, "scan_files", DEFAULT_SCAN_FILES),
+        getattr(args, "scan_bytes", DEFAULT_SCAN_BYTES),
+        getattr(args, "scan_seconds", DEFAULT_SCAN_SECONDS),
+    )
+    action_key = f"find:{args.query}:{args.max}:{context}:{offset}:{scan_limits}"
     allowed, guard_msg = check_guard(action_key, override=args.override)
     if not allowed:
         print(guard_msg)
@@ -175,6 +198,9 @@ def cmd_find(args: argparse.Namespace) -> int:
         max_results=args.max,
         context=context,
         offset=offset,
+        max_scan_files=scan_limits[0],
+        max_scan_bytes=scan_limits[1],
+        max_scan_seconds=scan_limits[2],
     )
     record_action(action_key, res)
     status = get_status_line(only_changes=True)
@@ -313,6 +339,9 @@ def main(argv: list[str] | None = None) -> int:
     # map
     map_parser = subparsers.add_parser("map", help="Display repo symbol outline map")
     map_parser.add_argument("--focus", default="", help="Map only this repository directory")
+    map_parser.add_argument("--scan-files", type=int, default=DEFAULT_SCAN_FILES, help="Maximum files to scan")
+    map_parser.add_argument("--scan-bytes", type=int, default=DEFAULT_SCAN_BYTES, help="Maximum bytes to scan")
+    map_parser.add_argument("--scan-seconds", type=float, default=DEFAULT_SCAN_SECONDS, help="Maximum scan duration")
     map_parser.add_argument("--override", action="store_true", help="Override task drift lockout")
 
     # find
@@ -321,6 +350,9 @@ def main(argv: list[str] | None = None) -> int:
     find_parser.add_argument("--max", type=int, default=5, help="Max results (default: 5; increase for more)")
     find_parser.add_argument("--context", type=int, default=0, help="Surrounding lines per match (default: 0)")
     find_parser.add_argument("--offset", type=int, default=0, help="Skip this many matches")
+    find_parser.add_argument("--scan-files", type=int, default=DEFAULT_SCAN_FILES, help="Maximum files to scan")
+    find_parser.add_argument("--scan-bytes", type=int, default=DEFAULT_SCAN_BYTES, help="Maximum bytes to scan")
+    find_parser.add_argument("--scan-seconds", type=float, default=DEFAULT_SCAN_SECONDS, help="Maximum scan duration")
     find_parser.add_argument("--override", action="store_true", help="Override task drift lockout")
 
     # read
