@@ -9,6 +9,7 @@ import json
 import os
 import re
 import shlex
+import time
 from pathlib import Path
 from typing import Dict, List, Optional, Set, Tuple
 
@@ -35,6 +36,9 @@ DEFAULT_IGNORES = {
 }
 
 MAX_SCAN_FILE_BYTES = 1_000_000
+DEFAULT_SCAN_FILES = 1_000
+DEFAULT_SCAN_BYTES = 50_000_000
+DEFAULT_SCAN_SECONDS = 10.0
 SYMBOL_SOURCE_SUFFIXES = {".py", ".js", ".jsx", ".ts", ".tsx", ".mjs", ".go", ".rs", ".java"}
 
 REGEX_PATTERNS = {
@@ -110,6 +114,50 @@ def _resolve_repo_path(fpath: Path, root: Path) -> Optional[Path]:
         return None
 
 
+def _iter_scan_files(root: Path, scan_root: Path, patterns: Set[str], deadline: float):
+    """Yield eligible files incrementally so directory traversal observes the time limit."""
+    try:
+        stack = [os.scandir(scan_root)]
+    except OSError:
+        return
+    try:
+        while stack:
+            if time.monotonic() >= deadline:
+                return
+            try:
+                entry = next(stack[-1])
+            except StopIteration:
+                stack.pop().close()
+                continue
+            except OSError:
+                stack.pop().close()
+                continue
+
+            fpath = Path(entry.path)
+            rel_file = fpath.relative_to(root).as_posix()
+            if is_ignored(rel_file, patterns):
+                continue
+            try:
+                if entry.is_dir(follow_symlinks=False):
+                    if _resolve_repo_path(fpath, root) is not None:
+                        stack.append(os.scandir(fpath))
+                elif entry.is_file(follow_symlinks=True) and _resolve_repo_path(fpath, root) is not None:
+                    yield fpath
+            except OSError:
+                continue
+    finally:
+        for entries in stack:
+            entries.close()
+
+
+def _scan_limit_message(reason: str, files: int, scanned_bytes: int) -> str:
+    return (
+        f"[Partial results: scan {reason} reached after {files} files / {scanned_bytes} bytes. "
+        "Narrow with --focus (map) or a more specific query (find), or increase "
+        "--scan-files, --scan-bytes, or --scan-seconds.]"
+    )
+
+
 def extract_python_symbols(source: str) -> List[str]:
     """Extract classes and functions from Python source using AST."""
     try:
@@ -171,7 +219,13 @@ def extract_symbols(fpath: Path, source_path: Optional[Path] = None) -> List[str
     return extract_regex_symbols(content, fpath.name)
 
 
-def generate_repo_map(root: Path = Path("."), focus: str = "") -> str:
+def generate_repo_map(
+    root: Path = Path("."),
+    focus: str = "",
+    max_scan_files: int = DEFAULT_SCAN_FILES,
+    max_scan_bytes: int = DEFAULT_SCAN_BYTES,
+    max_scan_seconds: float = DEFAULT_SCAN_SECONDS,
+) -> str:
     """Generate compact repo tree with symbol outlines, capped at ~1500 tokens (6000 chars)."""
     root = root.resolve()
     scan_root = (root / focus).resolve() if focus else root
@@ -190,31 +244,20 @@ def generate_repo_map(root: Path = Path("."), focus: str = "") -> str:
 
     updated_cache: dict = {"files": {}}
     map_lines: List[str] = []
+    max_scan_files = max(1, int(max_scan_files))
+    max_scan_bytes = max(1, int(max_scan_bytes))
+    deadline = time.monotonic() + max(0.001, float(max_scan_seconds))
+    scanned_files = 0
+    scanned_bytes = 0
+    partial_reason: Optional[str] = None
 
-    # Walk repository
-    all_files: List[Path] = []
-    for dirpath, dirnames, filenames in os.walk(scan_root):
-        rel_dir = os.path.relpath(dirpath, root)
-        if rel_dir != "." and is_ignored(rel_dir, patterns):
-            dirnames[:] = []  # Don't recurse
-            continue
-
-        # Filter out ignored directories
-        dirnames[:] = [
-            d
-            for d in dirnames
-            if not is_ignored(os.path.join(rel_dir if rel_dir != "." else "", d), patterns)
-            and _resolve_repo_path(Path(dirpath) / d, root) is not None
-        ]
-
-        for fname in sorted(filenames):
-            rel_file = os.path.normpath(os.path.join(rel_dir, fname)) if rel_dir != "." else fname
-            rel_file = rel_file.replace("\\", "/")
-            fpath = Path(dirpath) / fname
-            if not is_ignored(rel_file, patterns) and _resolve_repo_path(fpath, root) is not None:
-                all_files.append(fpath)
-
-    for fpath in sorted(all_files):
+    for fpath in _iter_scan_files(root, scan_root, patterns, deadline):
+        if scanned_files >= max_scan_files:
+            partial_reason = "file limit"
+            break
+        if time.monotonic() >= deadline:
+            partial_reason = "time limit"
+            break
         rel_str = fpath.relative_to(root).as_posix()
         resolved_fpath = _resolve_repo_path(fpath, root)
         if resolved_fpath is None:
@@ -223,7 +266,13 @@ def generate_repo_map(root: Path = Path("."), focus: str = "") -> str:
             stat = resolved_fpath.stat()
             mtime = stat.st_mtime
         except Exception:
+            scanned_files += 1
             continue
+        if scanned_bytes + stat.st_size > max_scan_bytes:
+            partial_reason = "byte limit"
+            break
+        scanned_files += 1
+        scanned_bytes += stat.st_size
 
         cached_entry = cache.get("files", {}).get(rel_str)
         if cached_entry and cached_entry.get("mtime") == mtime:
@@ -238,24 +287,46 @@ def generate_repo_map(root: Path = Path("."), focus: str = "") -> str:
         else:
             map_lines.append(rel_str)
 
+        if time.monotonic() >= deadline:
+            partial_reason = "time limit"
+            break
+
+    if partial_reason is None and time.monotonic() >= deadline:
+        partial_reason = "time limit"
+    if partial_reason:
+        updated_cache["files"] = {
+            **cache.get("files", {}),
+            **updated_cache["files"],
+        }
+
     # Save incremental cache
     cache_path.parent.mkdir(parents=True, exist_ok=True)
     cache_path.write_text(json.dumps(updated_cache, indent=2), encoding="utf-8")
 
     # Check budget (~6000 chars / ~1500 tokens)
     full_text = "\n".join(map_lines)
+    partial_message = (
+        _scan_limit_message(partial_reason, scanned_files, scanned_bytes)
+        if partial_reason
+        else ""
+    )
+    if partial_reason:
+        full_text = "\n".join(part for part in (full_text, partial_message) if part)
     if len(full_text) <= 6000:
         return full_text
 
     # Cap intelligently: keep file paths, drop symbol details if needed
     compacted: List[str] = []
     cur_len = 0
+    compact_limit = 5800 - len(partial_message) - bool(partial_message)
     for line in map_lines:
-        if cur_len + len(line) > 5800:
+        if cur_len + len(line) > compact_limit:
             compacted.append(f"... [{len(map_lines) - len(compacted)} more files omitted; use 'tg find <symbol>']")
             break
         compacted.append(line)
         cur_len += len(line) + 1
+    if partial_message:
+        compacted.append(partial_message)
 
     return "\n".join(compacted)
 
@@ -266,6 +337,9 @@ def find_symbol(
     max_results: int = 5,
     context: int = 0,
     offset: int = 0,
+    max_scan_files: int = DEFAULT_SCAN_FILES,
+    max_scan_bytes: int = DEFAULT_SCAN_BYTES,
+    max_scan_seconds: float = DEFAULT_SCAN_SECONDS,
 ) -> str:
     """Search with compact matches; request surrounding lines when needed."""
     root = Path(root).resolve()
@@ -282,68 +356,75 @@ def find_symbol(
     seen_matches = 0
     skipped_large = 0
     stopped_early = False
+    max_scan_files = max(1, int(max_scan_files))
+    max_scan_bytes = max(1, int(max_scan_bytes))
+    deadline = time.monotonic() + max(0.001, float(max_scan_seconds))
+    scanned_files = 0
+    scanned_bytes = 0
+    partial_reason: Optional[str] = None
 
-    for dirpath, dirnames, filenames in os.walk(root):
-        rel_dir = os.path.relpath(dirpath, root)
-        if rel_dir != "." and is_ignored(rel_dir, patterns):
-            dirnames[:] = []
+    for fpath in _iter_scan_files(root, root, patterns, deadline):
+        if scanned_files >= max_scan_files:
+            partial_reason = "file limit"
+            break
+        if time.monotonic() >= deadline:
+            partial_reason = "time limit"
+            break
+        rel_file = fpath.relative_to(root).as_posix()
+        resolved_fpath = _resolve_repo_path(fpath, root)
+        if resolved_fpath is None:
             continue
-        dirnames[:] = [
-            d
-            for d in dirnames
-            if not is_ignored(os.path.join(rel_dir if rel_dir != "." else "", d), patterns)
-            and _resolve_repo_path(Path(dirpath) / d, root) is not None
-        ]
+        try:
+            file_size = resolved_fpath.stat().st_size
+        except OSError:
+            scanned_files += 1
+            continue
+        if scanned_bytes + file_size > max_scan_bytes:
+            partial_reason = "byte limit"
+            break
+        scanned_files += 1
+        scanned_bytes += file_size
+        if file_size > MAX_SCAN_FILE_BYTES:
+            skipped_large += 1
+            continue
+        content = _read_scan_text(resolved_fpath)
+        if content is None:
+            continue
 
-        for fname in sorted(filenames):
-            rel_file = (os.path.normpath(os.path.join(rel_dir, fname)) if rel_dir != "." else fname).replace("\\", "/")
-            if is_ignored(rel_file, patterns):
-                continue
-
-            fpath = Path(dirpath) / fname
-            resolved_fpath = _resolve_repo_path(fpath, root)
-            if resolved_fpath is None:
-                continue
-            try:
-                if resolved_fpath.stat().st_size > MAX_SCAN_FILE_BYTES:
-                    skipped_large += 1
+        lines = content.splitlines()
+        for idx, line in enumerate(lines):
+            if regex.search(line):
+                if seen_matches < offset:
+                    seen_matches += 1
                     continue
-            except OSError:
-                continue
-            content = _read_scan_text(resolved_fpath)
-            if content is None:
-                continue
-
-            lines = content.splitlines()
-            for idx, line in enumerate(lines):
-                if regex.search(line):
-                    if seen_matches < offset:
-                        seen_matches += 1
-                        continue
-                    if len(matches) < max_results:
-                        line_num = idx + 1
-                        # Format hit with 1 line context
-                        ctx: List[str] = []
-                        if context:
-                            for nearby in range(max(0, idx - context), min(len(lines), idx + context + 1)):
-                                marker = ">" if nearby == idx else " "
-                                ctx.append(f"{marker} {nearby + 1:4d} | {lines[nearby]}")
-                            matches.append(f"{rel_file}:{line_num}\n" + "\n".join(ctx))
-                        else:
-                            matches.append(f"{rel_file}:{line_num}: {line.strip()}")
-                        seen_matches += 1
-                        if len(matches) >= max_results:
-                            stopped_early = True
-                            break
-            if stopped_early:
-                break
+                if len(matches) < max_results:
+                    line_num = idx + 1
+                    ctx: List[str] = []
+                    if context:
+                        for nearby in range(max(0, idx - context), min(len(lines), idx + context + 1)):
+                            marker = ">" if nearby == idx else " "
+                            ctx.append(f"{marker} {nearby + 1:4d} | {lines[nearby]}")
+                        matches.append(f"{rel_file}:{line_num}\n" + "\n".join(ctx))
+                    else:
+                        matches.append(f"{rel_file}:{line_num}: {line.strip()}")
+                    seen_matches += 1
+                    if len(matches) >= max_results:
+                        stopped_early = True
+                        break
         if stopped_early:
             break
+        if time.monotonic() >= deadline:
+            partial_reason = "time limit"
+            break
 
+    if partial_reason is None and time.monotonic() >= deadline:
+        partial_reason = "time limit"
     if not matches:
         result = f"No matches found for '{query}'."
         if skipped_large:
             result += f"\n[Skipped {skipped_large} files larger than {MAX_SCAN_FILE_BYTES // 1_000_000} MB.]"
+        if partial_reason:
+            result += "\n" + _scan_limit_message(partial_reason, scanned_files, scanned_bytes)
         return truncate_output(
             result,
             load_config(root).get("max_file_read_tokens", 2500),
@@ -355,6 +436,8 @@ def find_symbol(
         res += f"\n\n[Result limit {max_results} reached; increase max_results / --max or refine query.]"
     if skipped_large:
         res += f"\n\n[Skipped {skipped_large} files larger than {MAX_SCAN_FILE_BYTES // 1_000_000} MB.]"
+    if partial_reason:
+        res += "\n\n" + _scan_limit_message(partial_reason, scanned_files, scanned_bytes)
     limit = load_config(root).get("max_file_read_tokens", 2500)
     if estimate_tokens(res) <= limit:
         return res

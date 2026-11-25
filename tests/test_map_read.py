@@ -2,6 +2,7 @@
 
 import json
 from pathlib import Path
+import tg.map as map_module
 from tg.budget import estimate_tokens, save_config
 from tg.map import (
     generate_repo_map,
@@ -68,6 +69,52 @@ def test_find_symbol_compact_default_and_optional_context(tmp_path):
     assert "service.py:1: def target():" in compact
     assert "first = 1" not in compact
     assert "first = 1" in expanded
+
+
+def test_repo_map_scan_limits_return_partial_results_and_can_continue(tmp_path):
+    (tmp_path / "a.py").write_text("def first(): pass\n", encoding="utf-8")
+    (tmp_path / "b.py").write_text("def second(): pass\n", encoding="utf-8")
+
+    limited = generate_repo_map(tmp_path, max_scan_files=1)
+    assert ("a.py" in limited) != ("b.py" in limited)
+    assert "Partial results: scan file limit" in limited
+
+    continued = generate_repo_map(tmp_path, max_scan_files=2)
+    assert "a.py" in continued
+    assert "b.py" in continued
+    assert "Partial results" not in continued
+
+
+def test_find_symbol_scan_limits_report_partial_results(tmp_path):
+    (tmp_path / "a.txt").write_text("no match here\n", encoding="utf-8")
+    (tmp_path / "b.txt").write_text("target marker\n", encoding="utf-8")
+
+    limited = find_symbol("target", root=tmp_path, max_scan_files=1)
+    assert "Partial results: scan file limit" in limited
+
+    continued = find_symbol("target", root=tmp_path, max_scan_files=2)
+    assert "b.txt:1" in continued
+    assert "Partial results" not in continued
+
+
+def test_scan_byte_limit_and_time_limit(tmp_path, monkeypatch):
+    (tmp_path / "a.txt").write_text("a\n", encoding="utf-8")
+    (tmp_path / "b.txt").write_text("target\n", encoding="utf-8")
+
+    byte_limited = find_symbol("target", root=tmp_path, max_scan_bytes=2)
+    assert "Partial results: scan byte limit" in byte_limited
+    map_byte_limited = generate_repo_map(tmp_path, max_scan_bytes=2)
+    assert "Partial results: scan byte limit" in map_byte_limited
+
+    ticks = iter([0.0, 1.0])
+    monkeypatch.setattr(map_module.time, "monotonic", lambda: next(ticks, 1.0))
+    time_limited = generate_repo_map(tmp_path, max_scan_seconds=0.01)
+    assert "Partial results: scan time limit" in time_limited
+
+    ticks = iter([0.0, 1.0])
+    monkeypatch.setattr(map_module.time, "monotonic", lambda: next(ticks, 1.0))
+    time_limited_find = find_symbol("absent", root=tmp_path, max_scan_seconds=0.01)
+    assert "Partial results: scan time limit" in time_limited_find
 
 
 def test_repo_map_focus_is_confined_and_relative(tmp_path):
