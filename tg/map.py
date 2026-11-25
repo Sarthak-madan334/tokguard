@@ -152,9 +152,8 @@ def _iter_scan_files(root: Path, scan_root: Path, patterns: Set[str], deadline: 
 
 def _scan_limit_message(reason: str, files: int, scanned_bytes: int) -> str:
     return (
-        f"[Partial results: scan {reason} reached after {files} files / {scanned_bytes} bytes. "
-        "Narrow with --focus (map) or a more specific query (find), or increase "
-        "--scan-files, --scan-bytes, or --scan-seconds.]"
+f"[Partial results: scan {reason} reached after {files} files / {scanned_bytes} bytes. "
+"Narrow with focus (map) or a more specific query (find), or increase the scan limits.]"
     )
 
 
