@@ -204,18 +204,23 @@ def extract_regex_symbols(source: str, filename: str) -> List[str]:
     return []
 
 
-def extract_symbols(fpath: Path, source_path: Optional[Path] = None) -> List[str]:
-    """Extract top symbols from a given file."""
+def _extract_symbols_from_text(fpath: Path, content: Optional[str]) -> List[str]:
+    """Extract symbols from already-read source text."""
     suffix = fpath.suffix.lower()
-    if suffix not in SYMBOL_SOURCE_SUFFIXES:
-        return []
-    content = _read_scan_text(source_path or fpath)
-    if content is None:
+    if suffix not in SYMBOL_SOURCE_SUFFIXES or content is None:
         return []
 
     if suffix == ".py":
         return extract_python_symbols(content)
     return extract_regex_symbols(content, fpath.name)
+
+
+def extract_symbols(fpath: Path, source_path: Optional[Path] = None) -> List[str]:
+    """Extract top symbols from a given file."""
+    suffix = fpath.suffix.lower()
+    if suffix not in SYMBOL_SOURCE_SUFFIXES:
+        return []
+    return _extract_symbols_from_text(fpath, _read_scan_text(source_path or fpath))
 
 
 def generate_repo_map(
@@ -264,22 +269,41 @@ def generate_repo_map(
         try:
             stat = resolved_fpath.stat()
             mtime = stat.st_mtime
+            file_size = stat.st_size
         except Exception:
             scanned_files += 1
             continue
-        if scanned_bytes + stat.st_size > max_scan_bytes:
+        if scanned_bytes + file_size > max_scan_bytes:
             partial_reason = "byte limit"
             break
         scanned_files += 1
-        scanned_bytes += stat.st_size
+        scanned_bytes += file_size
 
+        is_source = fpath.suffix.lower() in SYMBOL_SOURCE_SUFFIXES
+        source_text = _read_scan_text(resolved_fpath) if is_source else None
+        content_hash = (
+            hashlib.sha256(source_text.encode("utf-8")).hexdigest()
+            if source_text is not None
+            else None
+        )
         cached_entry = cache.get("files", {}).get(rel_str)
-        if cached_entry and cached_entry.get("mtime") == mtime:
+        cache_matches = (
+            cached_entry
+            and cached_entry.get("mtime") == mtime
+            and cached_entry.get("size") == file_size
+            and (not is_source or cached_entry.get("content_hash") == content_hash)
+        )
+        if cache_matches:
             symbols = cached_entry.get("symbols", [])
         else:
-            symbols = extract_symbols(fpath, source_path=resolved_fpath)
+            symbols = _extract_symbols_from_text(fpath, source_text) if is_source else []
 
-        updated_cache["files"][rel_str] = {"mtime": mtime, "symbols": symbols}
+        updated_cache["files"][rel_str] = {
+            "mtime": mtime,
+            "size": file_size,
+            "content_hash": content_hash,
+            "symbols": symbols,
+        }
 
         if symbols:
             map_lines.append(f"{rel_str}: {', '.join(symbols)}")
