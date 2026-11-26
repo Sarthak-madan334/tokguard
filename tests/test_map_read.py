@@ -1,6 +1,7 @@
 """Unit tests for repo mapping, finding symbols, targeted reads and unchanged caching."""
 
 import json
+import os
 from pathlib import Path
 import tg.map as map_module
 from tg.budget import estimate_tokens, save_config
@@ -47,6 +48,27 @@ def test_repo_map_and_cache(tmp_path):
     # Check cache file was created
     cache_file = tmp_path / ".tokguard" / "map.json"
     assert cache_file.exists()
+
+
+def test_repo_map_cache_invalidates_same_size_edit_with_restored_mtime(tmp_path):
+    source = tmp_path / "service.py"
+    old_content = "def old_marker():\n    pass\n"
+    new_content = "def new_marker():\n    pass\n"
+    assert len(old_content.encode("utf-8")) == len(new_content.encode("utf-8"))
+    source.write_text(old_content, encoding="utf-8")
+
+    first_map = generate_repo_map(tmp_path)
+    assert "old_marker()" in first_map
+    original_stat = source.stat()
+
+    source.write_text(new_content, encoding="utf-8")
+    os.utime(source, ns=(original_stat.st_atime_ns, original_stat.st_mtime_ns))
+    assert source.stat().st_size == original_stat.st_size
+    assert source.stat().st_mtime_ns == original_stat.st_mtime_ns
+
+    second_map = generate_repo_map(tmp_path)
+    assert "new_marker()" in second_map
+    assert "old_marker()" not in second_map
 
 
 def test_find_symbol(tmp_path):
