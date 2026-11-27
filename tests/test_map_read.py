@@ -1,6 +1,7 @@
 """Unit tests for repo mapping, finding symbols, targeted reads and unchanged caching."""
 
 import json
+import os
 from pathlib import Path
 import tg.map as map_module
 from tg.budget import estimate_tokens, save_config
@@ -47,6 +48,62 @@ def test_repo_map_and_cache(tmp_path):
     # Check cache file was created
     cache_file = tmp_path / ".tokguard" / "map.json"
     assert cache_file.exists()
+
+
+def test_repo_map_cache_refreshes_edits_additions_and_deletions(tmp_path):
+    existing = tmp_path / "existing.py"
+    existing.write_text("def before_edit():\n    pass\n", encoding="utf-8")
+
+    first = generate_repo_map(tmp_path)
+    assert "before_edit()" in first
+
+    existing.write_text("def after_edit():\n    pass\n", encoding="utf-8")
+    added = tmp_path / "added.py"
+    added.write_text("def newly_added():\n    pass\n", encoding="utf-8")
+    removed = tmp_path / "removed.py"
+    removed.write_text("def deleted_symbol():\n    pass\n", encoding="utf-8")
+    assert "deleted_symbol()" in generate_repo_map(tmp_path)
+
+    removed.unlink()
+    refreshed = generate_repo_map(tmp_path)
+
+    assert "after_edit()" in refreshed
+    assert "before_edit()" not in refreshed
+    assert "added.py" in refreshed
+    assert "newly_added()" in refreshed
+    assert "removed.py" not in refreshed
+    assert "deleted_symbol()" not in refreshed
+
+
+def test_repo_map_cache_refreshes_when_mtime_and_size_are_unchanged(tmp_path):
+    source = tmp_path / "service.py"
+    source.write_text("def first():\n    pass\n", encoding="utf-8")
+    original_stat = source.stat()
+
+    first = generate_repo_map(tmp_path)
+    assert "first()" in first
+
+    source.write_text("def other():\n    pass\n", encoding="utf-8")
+    os.utime(source, ns=(original_stat.st_atime_ns, original_stat.st_mtime_ns))
+
+    refreshed = generate_repo_map(tmp_path)
+
+    assert "other()" in refreshed
+    assert "first()" not in refreshed
+
+
+def test_find_symbol_reflects_file_changes(tmp_path):
+    source = tmp_path / "service.py"
+    source.write_text("def old_name():\n    pass\n", encoding="utf-8")
+    generate_repo_map(tmp_path)
+    assert "service.py:1" in find_symbol("old_name", root=tmp_path)
+
+    source.write_text("def current_name():\n    pass\n", encoding="utf-8")
+    (tmp_path / "added.py").write_text("def added_name():\n    pass\n", encoding="utf-8")
+
+    assert "No matches" in find_symbol("old_name", root=tmp_path)
+    assert "service.py:1" in find_symbol("current_name", root=tmp_path)
+    assert "added.py:1" in find_symbol("added_name", root=tmp_path)
 
 
 def test_find_symbol(tmp_path):

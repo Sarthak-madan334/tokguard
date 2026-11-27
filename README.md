@@ -111,6 +111,7 @@ The hook uses the installed `tg` command. Install globally with `npm install -g 
 - **`tg map`**: Generates a compact AST/regex repo outline (~300 tokens vs 2,500+ for broad directory crawls).
 - **`tg find <symbol|regex>`**: Returns up to 5 matching lines by default. Increase `--max` for more results and use `--context` for surrounding lines.
 - **Focused maps**: `tg map --focus src` maps only that repository directory while keeping paths relative to the repository root.
+- **Fresh search results**: `tg map` checks current repository paths each time, reuses symbol extraction only when source contents match, and drops deleted paths. No manual cache clearing is needed; tg find searches current file contents directly and does not depend on the map cache.
 - **`tg read <file> <start>-<end>`**: Reads only requested line ranges with line numbers.
 - **Unchanged File Detection**: Automatically hashes read files in `.tokguard/session.json`. Repeated reads output `[unchanged since last read: lines X-Y]` instead of re-injecting hundreds of lines.
 - **`tg slim <file>`**: Safely removes comments, docstrings, and blank lines for read-only references.
