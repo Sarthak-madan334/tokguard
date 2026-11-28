@@ -82,6 +82,8 @@ tg verify
 
 The manager records a baseline, checks changed paths and work-order limits, reports drift with a correction, and blocks guarded tools when the task is off track. Log a justified expansion with `tg scope add <path> --reason "..."`; use `tg revert-plan` to see suggested recovery commands. `tg verify` runs the declared verification command and acceptance checks. Post-tool drift checks are advisory because Claude's `PostToolUse` event runs after the tool call.
 
+Starting a different user request in the same chat automatically archives the prior task and creates a fresh baseline when you run `tg plan --prompt "<new request>"`. Repeating the same prompt keeps its existing work order. Use `--new` only to restart the same prompt from a clean plan.
+
 ### Claude Code PostToolUse Claude Code settings.json hook snippet
 
 Add this to `~/.claude/settings.json` (Windows: `%USERPROFILE%\.claude\settings.json`) to check after edits, writes, and shell commands. Merge the `PostToolUse` entry with any hooks already configured:

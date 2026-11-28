@@ -166,7 +166,7 @@ def run(command: str, max_lines: int = 120, max_chars: int = 6000, full: bool = 
 @app.tool()
 @_cap_mcp_response
 def plan_lock(prompt: str, new: bool = False, override: bool = False) -> str:
-    """Lock the user's original task prompt verbatim before coding."""
+    """Lock the original prompt; a different prompt starts a fresh task in the same chat."""
     key = "mcp:plan_lock"
     allowed, message = check_guard(key, override=override)
     if not allowed:
