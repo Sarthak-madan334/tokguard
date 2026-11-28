@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from tg import manager
+from tg.cli import main as cli_main
 
 
 PROMPT = "Extend TokGuard with a task manager that locks the user's prompt and validates its work order."
@@ -62,8 +63,8 @@ def test_prompt_lock_is_verbatim_immutable_and_archivable(tmp_path):
     assert data["baseline_head"]
     assert data["baseline_dirty"] == []
     assert data["immutable"] is True
-    with pytest.raises(ValueError, match="already exists"):
-        manager.lock_prompt("different", tmp_path)
+    assert manager.lock_prompt(PROMPT, tmp_path, announce=False) == lock
+    assert not (tmp_path / ".tokguard" / "archive").exists()
     lock.chmod(0o666)
     changed = json.loads(lock.read_text(encoding="utf-8"))
     changed["prompt"] = "tampered"
@@ -83,16 +84,51 @@ def test_new_prompt_archives_and_resets_previous_work_order_state(tmp_path):
     (state / "scope.json").write_text(json.dumps([{"path": "src/", "reason": "approved"}]), encoding="utf-8")
     (state / "step-changes.json").write_text(json.dumps([{"step": "old step"}]), encoding="utf-8")
     (state / "drift.json").write_text(json.dumps([{"score": 35}]), encoding="utf-8")
+    (state / "session.json").write_text(json.dumps({
+        "cumulative_tokens": 1234,
+        "history": ["old-task-action"],
+        "checkpoint_notice": "STOP: previous task is off track",
+        "last_run_drift_signature": "old-signature",
+        "last_checkpoint_call": 8,
+    }), encoding="utf-8")
 
-    manager.lock_prompt("Start a different task.", tmp_path, new=True, announce=False)
+    new_prompt = "Start a different task in the same conversation and prepare a fresh task scope."
+    manager.lock_prompt(new_prompt, tmp_path, announce=False)
 
     assert not any((state / name).exists() for name in ("task.json", "task.md", "step.json", "scope.json", "step-changes.json", "drift.json"))
+    assert manager.read_lock(tmp_path)["prompt"] == new_prompt
+    session = json.loads((state / "session.json").read_text(encoding="utf-8"))
+    assert session["cumulative_tokens"] == 1234
+    assert session["history"] == ["old-task-action"]
+    assert "checkpoint_notice" not in session
+    assert "last_run_drift_signature" not in session
+    assert "last_checkpoint_call" not in session
     archive = state / "archive"
     assert list(archive.glob("task.*.json"))
     assert list(archive.glob("step.*.json"))
     assert list(archive.glob("scope.*.json"))
     assert list(archive.glob("drift.*.json"))
     assert list(archive.glob("step-changes.*.json"))
+
+
+def test_cli_accepts_new_prompt_when_previous_task_is_off_track(tmp_path, monkeypatch):
+    prepared_repo(tmp_path)
+    (tmp_path / "package.json").write_text("{}\n", encoding="utf-8")
+    (tmp_path / "outside.py").write_text("value = 1\n", encoding="utf-8")
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "tests" / "test_extra.py").write_text("def test_extra(): pass\n", encoding="utf-8")
+    (tmp_path / "README.md").unlink()
+    assert manager.check_drift(tmp_path, history=False)["level"] == "OFF TRACK"
+
+    monkeypatch.chdir(tmp_path)
+    new_prompt = "Handle a separate request in this same chat with a new scope and verification plan."
+    assert cli_main(["plan", "--prompt", new_prompt]) == 0
+    assert manager.read_lock(tmp_path)["prompt"] == new_prompt
+    assert not (tmp_path / ".tokguard" / "task.json").exists()
+    new_order = make_order()
+    new_order["objective"] = new_prompt
+    manager.submit_order(json.dumps(new_order), tmp_path, announce=False)
+    assert manager.check_drift(tmp_path, history=False)["level"] == "ON TRACK"
 
 
 def test_new_work_order_ignores_prior_task_actions_for_stall_and_repeat_signals(tmp_path):

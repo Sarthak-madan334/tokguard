@@ -5,6 +5,7 @@ from tg.mcp_server import map as mcp_map, find as mcp_find, read_range as mcp_re
 from tg.mcp_server import plan_lock as mcp_plan_lock, plan_submit as mcp_plan_submit, check as mcp_check, step as mcp_step, scope_add as mcp_scope_add
 from tg.budget import estimate_tokens, reset_session, save_config
 import json
+from tg import manager
 
 
 def test_mcp_map_and_find(tmp_path, monkeypatch):
@@ -76,3 +77,31 @@ def test_mcp_manager_tools_lock_submit_check_step_and_scope(tmp_path, monkeypatc
     assert "Step one" in mcp_step("show")
     assert "Step one done" in mcp_step("done", step_id="one")
     assert "Scope added" in mcp_scope_add("tg/generated/", "The task explicitly requires this generated output.")
+
+
+def test_mcp_plan_lock_starts_a_new_task_in_the_same_chat(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    reset_session(tmp_path)
+    first_prompt = "Fix the current task with its existing scope and verification steps."
+    second_prompt = "Start an unrelated task in this same chat with a clean work order."
+
+    assert "Prompt locked" in mcp_plan_lock(first_prompt)
+    assert "Prompt locked" in mcp_plan_lock(second_prompt)
+
+    assert manager.read_lock(tmp_path)["prompt"] == second_prompt
+    assert list((tmp_path / ".tokguard" / "archive").glob("task.lock.*.json"))
+
+
+def test_mcp_plan_lock_can_start_a_new_task_when_old_task_is_blocked(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    reset_session(tmp_path)
+    first_prompt = "Fix the current task with its existing scope and verification steps."
+    second_prompt = "Start an unrelated task in this same chat with a clean work order."
+    assert "Prompt locked" in mcp_plan_lock(first_prompt)
+    monkeypatch.setattr(manager, "lockout_message", lambda root=Path("."): "STOP: previous task is off track")
+
+    result = mcp_plan_lock(second_prompt)
+
+    assert "Prompt locked" in result
+    assert "previous task is off track" not in result
+    assert manager.read_lock(tmp_path)["prompt"] == second_prompt

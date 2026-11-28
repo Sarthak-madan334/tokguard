@@ -191,6 +191,7 @@ def check_guard(
     session = load_session(root)
     recovery = (
         action_key in {"cmd:handoff", "mcp:check", "mcp:handoff", "mcp:revert-plan", "check", "handoff", "revert-plan"}
+        or action_key == "mcp:plan_lock"
         or action_key.startswith(("cmd:budget --reset", "mcp:scope_add:", "scope:add:"))
     )
     if recovery or override:

@@ -377,10 +377,10 @@ def main(argv: list[str] | None = None) -> int:
     handoff_parser.add_argument("--override", action="store_true")
 
     # task manager
-    plan_parser = subparsers.add_parser("plan", help="Lock a prompt or submit its manager work order")
+    plan_parser = subparsers.add_parser("plan", help="Lock a prompt (a different prompt starts a fresh task) or submit its manager work order")
     plan_parser.add_argument("--prompt", help="Lock the user's original prompt verbatim")
     plan_parser.add_argument("--submit", help="Submit a JSON work order file, or - for stdin")
-    plan_parser.add_argument("--new", action="store_true", help="Archive and replace the existing task lock")
+    plan_parser.add_argument("--new", action="store_true", help="Restart the task even when the prompt is unchanged")
     plan_parser.add_argument("--override", action="store_true")
     check_parser = subparsers.add_parser("check", help="Measure task drift")
     check_parser.add_argument("--json", action="store_true")
@@ -439,7 +439,7 @@ def main(argv: list[str] | None = None) -> int:
     recovery = args.subcommand in {"check", "handoff", "revert-plan"}
     recovery |= args.subcommand == "scope" and getattr(args, "scope_action", "") == "add"
     recovery |= args.subcommand == "budget" and getattr(args, "reset", False)
-    recovery |= args.subcommand == "plan" and getattr(args, "new", False)
+    recovery |= args.subcommand == "plan" and (getattr(args, "new", False) or getattr(args, "prompt", None) is not None)
     if blocked and not getattr(args, "override", False) and not recovery:
         print(blocked)
         return 1

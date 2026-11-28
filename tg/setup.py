@@ -15,6 +15,7 @@ _END = "<!-- tokguard:end -->"
 _SERVER = {"command": "npx", "args": ["-y", "tokguard@latest", "mcp"]}
 _GUIDANCE = (
     "First action: `tg plan --prompt \"<original user prompt>\"`, then write and submit the work order as a senior tech manager.\n"
+    "A different prompt in the same chat starts a fresh task and archives the previous work order; repeating the same prompt keeps the current task.\n"
     "Do only what the work order says. Obey every DRIFT message. Update scope only with a reason.\n"
     "Finish only after `tg verify` PASS.\n"
     "Map first with `tg map`; search with `tg find`; read only targeted ranges or symbols.\n"

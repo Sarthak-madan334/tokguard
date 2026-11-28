@@ -87,7 +87,11 @@ def lock_prompt(prompt: str, root: Path = Path("."), new: bool = False, announce
     path = state / "task.lock.json"
     if path.exists():
         if not new:
-            raise ValueError("task lock already exists; pass --new to archive it")
+            existing = read_lock(root)
+            if existing.get("prompt") == prompt:
+                if announce:
+                    print("Prompt already locked; continuing the existing task.")
+                return path
         archive = state / "archive"
         archive.mkdir(exist_ok=True)
         stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
@@ -100,6 +104,12 @@ def lock_prompt(prompt: str, root: Path = Path("."), new: bool = False, announce
             previous = state / name
             if previous.exists():
                 previous.replace(archive / f"{previous.stem}.{stamp}{previous.suffix}")
+        session_path = state / "session.json"
+        if session_path.exists():
+            session = json.loads(session_path.read_text(encoding="utf-8"))
+            for key in ("checkpoint_notice", "last_run_drift_signature", "last_checkpoint_call"):
+                session.pop(key, None)
+            session_path.write_text(json.dumps(session, indent=2) + "\n", encoding="utf-8")
     status = _status(root)
     dirty = [name for _, name in status]
     head = _git(root, "rev-parse", "HEAD")
@@ -292,7 +302,10 @@ def check_drift(root: Path = Path("."), history: bool = True) -> dict[str, Any]:
     live_status = _status(root) if lock.get("baseline_head") else []
     current_untracked = {name for code, name in live_status if "?" in code}
     changed.update(current_untracked - base_untracked - baseline_dirty)
-    changed.update(name for name in base_untracked if not (root / name).exists())
+    # A tracked path already deleted before this task's baseline is still in
+    # baseline_dirty; only pre-existing untracked files need this missing-file
+    # check because they are not represented in the tracked snapshot.
+    changed.update(name for name in lock.get("baseline_untracked", []) if not (root / name).exists())
     # Older locks do not have snapshots. Keep their pre-existing dirty paths out of the score.
     if not baseline:
         changed = set(_git(root, "diff", "--name-only", lock.get("baseline_head", "HEAD")).splitlines()) if lock.get("baseline_head") else set()
